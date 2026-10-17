@@ -681,6 +681,13 @@ html[data-theme="light"] .aurora { opacity: .5; }
   z-index: -1;
   overflow: hidden;
 }
+/* 已声明 width/height 防止布局抖动，这里必须让高度跟随宽度，
+   否则会按声明高度 722px 渲染而被压扁。 */
+.hero-media img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
 .hero-media img {
   width: 100%; height: 100%;
   object-fit: cover;
