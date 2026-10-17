@@ -1948,3 +1948,16 @@ html.js-ready [data-reveal].is-in { opacity: 1; transform: none; animation: none
   #sky, .aurora, .grain, .to-top, .scroll-progress, .site-header { display: none !important; }
   body { background: #fff; color: #000; }
 }
+
+/* 版本标记：便于确认线上是否为最新版 */
+.build-tag {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 215, 155, .45);
+  background: rgba(242, 215, 155, .12);
+  color: #f2d79b;
+  font-size: .68rem;
+  letter-spacing: .04em;
+}
