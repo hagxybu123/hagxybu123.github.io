@@ -9,6 +9,8 @@
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 共用的随机数工具（星野与开场页漩涡都要用）
+  var rnd = function (a, b) { return a + Math.random() * (b - a); };
 
   /* ---------------------------------------------------------------- 星野 */
   function initSky() {
@@ -31,8 +33,6 @@
     var last = 0, acc = 0;
     var cometAt = 0;
     var frameId = null;
-
-    function rnd(a, b) { return a + Math.random() * (b - a); }
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -639,17 +639,221 @@
 
     body.classList.add('is-locked');
 
+    /* ---------------- 星空漩涡：汇聚 → 停顿 → 炸开 ---------------- */
+    var vortex = $('#vortex');
+    var vctx = vortex ? vortex.getContext('2d') : null;
+    var parts = [];
+    var vw = 0, vh = 0, vraf = null;
+    var phase = 'idle';   // idle | converge | hold | explode
+    var phaseAt = 0;
+
+    function vresize() {
+      if (!vortex) return;
+      var d = Math.min(window.devicePixelRatio || 1, 2);
+      vw = window.innerWidth;
+      vh = window.innerHeight;
+      vortex.width = Math.floor(vw * d);
+      vortex.height = Math.floor(vh * d);
+      vctx.setTransform(d, 0, 0, d, 0, 0);
+    }
+
+    function palette2(h) {
+      if (h === 'gold') return '255, 232, 168';
+      if (h === 'ice') return '205, 232, 255';
+      return '255, 255, 255';
+    }
+
+    function vbuild() {
+      parts = [];
+      var cx = vw / 2, cy = vh / 2;
+      // 先清空画布，保证"整片星空"都参与漩涡
+      vctx.clearRect(0, 0, vw, vh);
+      var n = Math.min(420, Math.max(160, Math.round((vw * vh) / 4200)));
+      for (var i = 0; i < n; i++) {
+        var ang = Math.random() * Math.PI * 2;
+        // 中心稀疏、外圈密集，汇聚时层次更好看
+        var dist = rnd(30, Math.max(vw, vh) * 0.78);
+        var roll = Math.random();
+        parts.push({
+          x: cx + Math.cos(ang) * dist,
+          y: cy + Math.sin(ang) * dist,
+          px: 0, py: 0,
+          r: rnd(0.7, 2.6),
+          speed: rnd(0.012, 0.055),
+          ang: ang,
+          spin: rnd(-0.016, 0.016),
+          hue: roll > 0.58 ? 'gold' : (roll > 0.26 ? 'ice' : 'white'),
+          life: 1,
+          tvx: 0, tvy: 0
+        });
+      }
+      for (var j = 0; j < parts.length; j++) { parts[j].px = parts[j].x; parts[j].py = parts[j].y; }
+    }
+
+    function vdraw(now) {
+      vctx.clearRect(0, 0, vw, vh);
+      var cx = vw / 2, cy = vh / 2;
+
+      // 汇聚时给中心加一个逐渐增强的引力光核
+      if (phase === 'converge' || phase === 'hold') {
+        var el = now - phaseAt;
+        var core = phase === 'hold' ? 1 : Math.min(1, el / 620);
+        var cr = 26 + core * 92;
+        var cg = vctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+        cg.addColorStop(0, 'rgba(255, 255, 255, ' + (0.92 * core).toFixed(3) + ')');
+        cg.addColorStop(0.4, 'rgba(190, 220, 255, ' + (0.42 * core).toFixed(3) + ')');
+        cg.addColorStop(1, 'rgba(140, 180, 255, 0)');
+        vctx.fillStyle = cg;
+        vctx.beginPath();
+        vctx.arc(cx, cy, cr, 0, Math.PI * 2);
+        vctx.fill();
+      }
+
+      // 炸开时的冲击光环
+      if (phase === 'explode') {
+        var e2 = now - phaseAt;
+        if (e2 < 900) {
+          var ring = e2 * 1.9;
+          vctx.strokeStyle = 'rgba(255, 240, 210, ' + Math.max(0, 0.75 * (1 - e2 / 900)).toFixed(3) + ')';
+          vctx.lineWidth = Math.max(1, 16 * (1 - e2 / 900));
+          vctx.beginPath();
+          vctx.arc(cx, cy, ring, 0, Math.PI * 2);
+          vctx.stroke();
+          var fg = vctx.createRadialGradient(cx, cy, 0, cx, cy, 60 + e2 * 2.4);
+          fg.addColorStop(0, 'rgba(255, 255, 255, ' + Math.max(0, 0.6 * (1 - e2 / 700)).toFixed(3) + ')');
+          fg.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          vctx.fillStyle = fg;
+          vctx.beginPath();
+          vctx.arc(cx, cy, 60 + e2 * 2.4, 0, Math.PI * 2);
+          vctx.fill();
+        }
+      }
+
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i];
+        var col = palette2(p.hue);
+        if (p.life <= 0) continue;
+        // 拖尾：从上一帧位置画一条渐隐线，运动感更强
+        if (phase === 'explode') {
+          vctx.strokeStyle = 'rgba(' + col + ', ' + (p.life * 0.5).toFixed(3) + ')';
+          vctx.lineWidth = p.r * 0.9;
+          vctx.beginPath();
+          vctx.moveTo(p.px, p.py);
+          vctx.lineTo(p.x, p.y);
+          vctx.stroke();
+        }
+        // 每颗星带光晕，汇聚时才像"星光流"
+        var gr = p.r * (phase === 'explode' ? 5 : 3.4);
+        var g2 = vctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
+        g2.addColorStop(0, 'rgba(' + col + ', ' + (p.life * 0.6).toFixed(3) + ')');
+        g2.addColorStop(1, 'rgba(' + col + ', 0)');
+        vctx.fillStyle = g2;
+        vctx.beginPath();
+        vctx.arc(p.x, p.y, gr, 0, Math.PI * 2);
+        vctx.fill();
+
+        // 白芯
+        vctx.fillStyle = 'rgba(255, 255, 255, ' + p.life.toFixed(3) + ')';
+        vctx.beginPath();
+        vctx.arc(p.x, p.y, p.r * 0.7, 0, Math.PI * 2);
+        vctx.fill();
+      }
+    }
+
+    function vframe() {
+      var now = Date.now();
+      var cx = vw / 2, cy = vh / 2;
+
+      if (phase === 'converge') {
+        for (var i = 0; i < parts.length; i++) {
+          var p = parts[i];
+          p.px = p.x; p.py = p.y;
+          var dx = cx - p.x, dy = cy - p.y;
+          var d = Math.sqrt(dx * dx + dy * dy) || 1;
+          // 越靠近中心越快 —— 形成"吸入"的加速感
+          var pull = p.speed * (1 + Math.max(0, 300 - d) / 90) * 1.35;
+          p.x += dx * pull;
+          p.y += dy * pull;
+          p.ang += p.spin;
+          // 一点点切向偏移，轨迹弯曲成漩涡
+          p.x += Math.cos(p.ang + Math.PI / 2) * 0.7;
+          p.y += Math.sin(p.ang + Math.PI / 2) * 0.7;
+        }
+        vdraw(now);
+        if (now - phaseAt > 620) {
+          phase = 'hold';
+          phaseAt = now;
+        }
+      } else if (phase === 'hold') {
+        vdraw(now);
+        if (now - phaseAt > 190) {
+          phase = 'explode';
+          phaseAt = now;
+          for (var k = 0; k < parts.length; k++) {
+            var q = parts[k];
+            var ox = q.x - cx, oy = q.y - cy;
+            var od = Math.sqrt(ox * ox + oy * oy) || 1;
+            var lvl = rnd(3.6, 15);
+            q.tvx = (ox / od) * lvl;
+            q.tvy = (oy / od) * lvl;
+          }
+        }
+      } else if (phase === 'explode') {
+        var done = 0;
+        for (var m = 0; m < parts.length; m++) {
+          var s2 = parts[m];
+          s2.px = s2.x; s2.py = s2.y;
+          s2.x += s2.tvx;
+          s2.y += s2.tvy;
+          s2.tvx *= 0.975;
+          s2.tvy *= 0.975;
+          s2.life -= 0.016;
+          if (s2.life <= 0) done++;
+        }
+        vdraw(now);
+        if (done >= parts.length) {
+          vraf = null;
+          return;   // 收工
+        }
+      }
+      vraf = window.requestAnimationFrame(vframe);
+    }
+    /* ------------------------------------------------------------ */
+
     var closed = false;
+    // 画布可用即可播放漩涡（粒子在点击时才生成，不能作为判断条件）
+    var canVortex = !!(vortex && vctx) && !reduceMotion;
+
     function enter() {
       if (closed) return;
       closed = true;
+
+      if (canVortex) {
+        entry.classList.add('is-sucking');
+        vresize();
+        vbuild();
+        phase = 'converge';
+        phaseAt = Date.now();
+        vframe();
+      }
+
       try { sessionStorage.setItem('tianyi-entered', '1'); } catch (e) {}
-      entry.classList.add('is-gone');
-      body.classList.remove('is-locked');
+
+      var uiDelay = canVortex ? 1000 : 0;
+      var killDelay = canVortex ? 1900 : 820;
+
+      window.setTimeout(function () {
+        entry.classList.add('is-gone');
+        body.classList.remove('is-locked');
+      }, uiDelay);
+
       window.setTimeout(function () {
         if (entry.parentNode) entry.parentNode.removeChild(entry);
-      }, 820);
+      }, killDelay);
     }
+
+    vresize();
+    window.addEventListener('resize', function () { if (phase === 'idle') vresize(); }, { passive: true });
 
     entry.addEventListener('click', enter);
     document.addEventListener('keydown', function (e) {

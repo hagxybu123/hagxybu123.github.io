@@ -97,6 +97,21 @@ html[data-theme="light"] {
   0%, 100% { opacity: .55; }
   50% { opacity: 1; }
 }
+/* 漩涡画布：铺满开场页，位于 UI 之下 */
+.entry-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.entry-inner { z-index: 2; }
+/* 进入瞬间 UI 快速淡出，把舞台交给漩涡 */
+.entry.is-sucking .entry-inner,
+.entry.is-sucking .entry-glow { opacity: 0; transition: opacity .35s var(--ease); }
+.entry.is-sucking::before { opacity: 0; transition: opacity .4s var(--ease); }
+
 .entry.is-gone {
   opacity: 0;
   visibility: hidden;
