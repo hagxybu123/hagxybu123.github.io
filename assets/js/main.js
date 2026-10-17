@@ -172,7 +172,7 @@
           ph: Math.random() * Math.PI * 2,
           sp: rnd(0.004, 0.011),
           // 背景压暗后有了空间，极光可以更明显一点（氛围感主力）
-          a: rnd(0.58, 0.95)
+          a: rnd(0.30, 0.52)
         });
       }
 
@@ -191,7 +191,7 @@
           ht: rnd(h * 1.0, h * 1.5),
           ph: Math.random() * Math.PI * 2,
           sp: rnd(0.0025, 0.007),
-          a: rnd(0.16, 0.34)
+          a: rnd(0.08, 0.17)
         });
       }
 
@@ -428,9 +428,9 @@
         var g = ctx.createRadialGradient(cl.x, cl.y, 0, cl.x, cl.y, cl.r);
         var cc = cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2];
         // 多层停靠点：中心明亮，中段仍有厚度，边缘才散开
-        g.addColorStop(0, 'rgba(' + cc + ', ' + Math.min(1, cl.a * pulse * 0.48).toFixed(3) + ')');
-        g.addColorStop(0.30, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.26).toFixed(3) + ')');
-        g.addColorStop(0.62, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.11).toFixed(3) + ')');
+        g.addColorStop(0, 'rgba(' + cc + ', ' + Math.min(1, cl.a * pulse * 0.21).toFixed(3) + ')');
+        g.addColorStop(0.30, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.18).toFixed(3) + ')');
+        g.addColorStop(0.62, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.07).toFixed(3) + ')');
         g.addColorStop(1, 'rgba(' + cc + ', 0)');
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -696,15 +696,15 @@
           var dxs = b1.x - a1.x, dys = b1.y - a1.y;
           if (dxs * dxs + dys * dys > 40000) continue;   // 跨度太大（换手/跳点）不连
           // 外层柔光
-          ctx.strokeStyle = 'rgba(' + palette(a1.hue) + ', ' + (la * 0.30).toFixed(3) + ')';
-          ctx.lineWidth = (5 + a1.r * 2.4) * la;
+          ctx.strokeStyle = 'rgba(' + palette(a1.hue) + ', ' + (la * 0.62).toFixed(3) + ')';
+          ctx.lineWidth = Math.max(2.4, (7 + a1.r * 3.2) * la);
           ctx.beginPath();
           ctx.moveTo(a1.x, a1.y);
           ctx.lineTo(b1.x, b1.y);
           ctx.stroke();
           // 内层高光：白芯，让光带中间是亮的
-          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (la * 0.34).toFixed(3) + ')';
-          ctx.lineWidth = Math.max(0.7, (1.2 + a1.r * 0.55) * la);
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (la * 0.72).toFixed(3) + ')';
+          ctx.lineWidth = Math.max(1.6, (1.8 + a1.r * 0.8) * la);
           ctx.beginPath();
           ctx.moveTo(a1.x, a1.y);
           ctx.lineTo(b1.x, b1.y);
@@ -717,7 +717,7 @@
           if (tp2.life <= 0) continue;
           var breath = 0.66 + 0.34 * Math.sin(tp2.ph);
           var talpha = tp2.life * breath;
-          halo(palette(tp2.hue), tp2.x, tp2.y, tp2.r * 11, talpha * 1.25);
+          halo(palette(tp2.hue), tp2.x, tp2.y, tp2.r * 15, talpha * 1.9);
           ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, talpha * 1.5).toFixed(3) + ')';
           ctx.beginPath();
           ctx.arc(tp2.x, tp2.y, tp2.r * 0.5 * tp2.life + 1.2, 0, Math.PI * 2);
@@ -727,7 +727,7 @@
         // ③ 笔尖：最新那点的头部更亮，像一颗正在划过的流星
         var tip = trail[trail.length - 1];
         if (tip && tip.life > 0) {
-          halo('255, 255, 255', tip.x, tip.y, tip.r * 14, Math.min(1, tip.life * 1.1));
+          halo('255, 255, 255', tip.x, tip.y, tip.r * 22, Math.min(1, tip.life * 1.5));
           halo('255, 232, 168', tip.x, tip.y, tip.r * 8, Math.min(1, tip.life * 0.9));
         }
       }
