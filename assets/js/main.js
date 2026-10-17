@@ -1022,17 +1022,21 @@
     var STORE = 'tianyi-bgm';
     var broken = false;
 
+    var TRACK = '只想守护你';
+    var TRACK_SUB = '高见泽俊彦';
+
     function paint(playing) {
       if (btn) {
         btn.classList.toggle('is-playing', playing);
         btn.setAttribute('aria-pressed', String(playing));
-        btn.setAttribute('aria-label', playing ? '暂停背景音乐' : '播放背景音乐');
+        btn.setAttribute('aria-label', playing ? '暂停背景音乐：' + TRACK : '播放背景音乐：' + TRACK);
+        btn.setAttribute('title', '背景音乐：' + TRACK + ' · ' + TRACK_SUB);
       }
       if (entryBtn) {
         entryBtn.classList.toggle('is-on', playing);
         entryBtn.setAttribute('aria-pressed', String(playing));
         var txt = entryBtn.querySelector('.em-text');
-        if (txt) txt.textContent = playing ? '正在播放「英雄」' : '播放「英雄」· 奥特曼传奇';
+        if (txt) txt.textContent = playing ? '正在播放「' + TRACK + '」' : '播放「' + TRACK + '」· ' + TRACK_SUB;
       }
       if (label) label.hidden = !playing;
     }
