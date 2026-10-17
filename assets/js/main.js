@@ -152,8 +152,15 @@
       dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
       w = canvas.clientWidth = window.innerWidth;
       h = canvas.clientHeight = window.innerHeight;
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
+      var nw = Math.floor(w * dpr), nh = Math.floor(h * dpr);
+
+      /* 只在尺寸真的变化时才给 canvas.width/height 赋值。
+         赋值会重新分配显存纹理并清空画布；手机地址栏延迟隐藏、软键盘弹出
+         都会触发 resize，不加判断就会反复重分配 —— 在 QQ 的 X5 内核上
+         表现为画布闪一下。尺寸没变时连重建星点都跳过。 */
+      if (canvas.width === nw && canvas.height === nh && stars.length) return;
+      canvas.width = nw;
+      canvas.height = nh;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       build();
     }
@@ -1488,20 +1495,35 @@
       var d = Math.min(window.devicePixelRatio || 1, 2);
       vw = window.innerWidth;
       vh = window.innerHeight;
-      vortex.width = Math.floor(vw * d);
-      vortex.height = Math.floor(vh * d);
+      var nw = Math.floor(vw * d);
+      var nh = Math.floor(vh * d);
+
+      /* 只在尺寸真的变化时才给 canvas.width/height 赋值。
+         为什么必须判断：给 width/height 赋值会【重新分配显存纹理并清空画布】。
+         手机浏览器地址栏延迟自动隐藏会改变窗口高度、触发 resize ——
+         于是画布被重新分配，在 QQ 的 X5 内核上表现为整个画布闪一下。
+         这正是"进去等一会才开始闪"的原因（地址栏是延迟隐藏的）。
+         加了这个判断后，尺寸没变就不再重分配。 */
+      var sizeChanged = (vortex.width !== nw || vortex.height !== nh);
+      if (sizeChanged) {
+        vortex.width = nw;
+        vortex.height = nh;
+      }
       vctx.setTransform(d, 0, 0, d, 0, 0);
 
-      // 离屏画布与可见画布同尺寸
+      // 离屏画布与可见画布同尺寸（同样只在变化时重分配）
       if (!voff) {
         voff = document.createElement('canvas');
         voffctx = voff.getContext('2d');
       }
       if (voff) {
-        voff.width = vortex.width;
-        voff.height = vortex.height;
+        if (voff.width !== nw || voff.height !== nh) {
+          voff.width = nw;
+          voff.height = nh;
+        }
         if (voffctx) voffctx.setTransform(d, 0, 0, d, 0, 0);
       }
+      return sizeChanged;
     }
 
     function palette2(h) {
@@ -1800,7 +1822,22 @@
     }
 
     vresize();
-    window.addEventListener('resize', function () { if (phase === 'idle') vresize(); }, { passive: true });
+    /* resize 处理：
+       · 尺寸没变（常见于地址栏收起、软键盘弹出等） -> 什么都不做，
+         连画布重绘都省掉，避免无谓的显存操作。
+       · 尺寸变了 -> 若动画正在跑，等它自己按新尺寸重绘；
+         若动画处于 idle（还没开始或有已收工），立刻补画一帧，
+         否则画布会停在"已清空"的空白状态（表现为闪一下白）。 */
+    window.addEventListener('resize', function () {
+      var changed = vresize();
+      if (!changed) return;
+      if (phase === 'idle' && vctx) {
+        try {
+          vctx.setTransform(1, 0, 0, 1, 0, 0);
+          vctx.clearRect(0, 0, vortex.width, vortex.height);
+        } catch (e) {}
+      }
+    }, { passive: true });
 
     entry.addEventListener('click', enter);
     document.addEventListener('keydown', function (e) {
