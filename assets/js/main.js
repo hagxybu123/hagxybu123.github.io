@@ -79,6 +79,8 @@
     var lastPaint = 0;
     var aurora = [];         // 极光帘幕
     var auroraT = 0;
+    var shafts = [];         // 深空漫射光柱（体积光）
+    var coreGlow = 0;        // 中心辉光呼吸相位
     var w = 0, h = 0, dpr = 1;
     var scrollY = window.scrollY || 0;
     var mx = -9999, my = -9999;
@@ -174,6 +176,25 @@
         });
       }
 
+      // 深空漫射光柱：几道斜向的柔光，缓慢明灭（氛围感主力之一）
+      shafts = [];
+      var shaftDefs = mobile
+        ? [[0.30, -14, '150, 200, 255'], [0.72, 12, '198, 178, 255']]
+        : [[0.18, -16, '150, 200, 255'], [0.42, -7, '205, 232, 255'],
+           [0.63, 8, '198, 178, 255'], [0.86, 15, '255, 190, 220']];
+      for (var sh = 0; sh < shaftDefs.length; sh++) {
+        shafts.push({
+          x: w * shaftDefs[sh][0],
+          deg: shaftDefs[sh][1],
+          rgb: shaftDefs[sh][2],
+          wd: rnd(w * 0.10, w * 0.22),
+          ht: rnd(h * 1.0, h * 1.5),
+          ph: Math.random() * Math.PI * 2,
+          sp: rnd(0.0025, 0.007),
+          a: rnd(0.16, 0.34)
+        });
+      }
+
       // 星云：亮色云团（中心实、边缘透），是"星光感"的主体
       clouds = [
         { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.44, vx: 0.022, vy: 0.011, c: [104, 152, 255], a: 0.92 },
@@ -191,9 +212,33 @@
       return '255, 255, 255';
     }
 
-    /* 极光帘幕精灵：竖直方向的柔光条纹，预渲染成图后反复拉伸使用。
-       关键：绝不在帧循环里 createGradient —— 那正是之前闪屏的主因。
-       注意 spriteCache 在本函数之后才被赋值，这里做惰性兜底避免 undefined。 */
+    /* 体积光柱精灵：一条竖直的柔光，用于斜着拉伸成"深空漫射光"。
+       同样预渲染，帧循环只做 drawImage。 */
+    function shaftSprite(rgb) {
+      if (!spriteCache) spriteCache = {};
+      var key = 'shaft|' + rgb;
+      var s = spriteCache[key];
+      if (s) return s;
+      var c = document.createElement('canvas');
+      c.width = 64; c.height = 256;
+      var g = c.getContext('2d');
+      if (!g) return null;
+      var v = g.createLinearGradient(0, 256, 0, 0);
+      v.addColorStop(0, 'rgba(' + rgb + ', 0.85)');
+      v.addColorStop(0.5, 'rgba(' + rgb + ', 0.30)');
+      v.addColorStop(1, 'rgba(' + rgb + ', 0)');
+      g.fillStyle = v;
+      g.fillRect(0, 0, 64, 256);
+      g.globalCompositeOperation = 'destination-in';
+      var h = g.createLinearGradient(0, 0, 64, 0);
+      h.addColorStop(0, 'rgba(0,0,0,0)');
+      h.addColorStop(0.5, 'rgba(0,0,0,1)');
+      h.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = h;
+      g.fillRect(0, 0, 64, 256);
+      spriteCache[key] = c;
+      return c;
+    }
     function auroraSprite(rgb) {
       if (!spriteCache) spriteCache = {};
       var key = 'aurora|' + rgb;
@@ -326,6 +371,27 @@
       }
 
       ctx.clearRect(0, 0, w, h);
+
+      // 深空漫射光柱：斜向柔光缓慢明灭，最底层
+      if (shafts.length) {
+        coreGlow += dt;
+        ctx.globalCompositeOperation = 'lighter';
+        for (var sf = 0; sf < shafts.length; sf++) {
+          var sk = shafts[sf];
+          sk.ph += sk.sp * dt;
+          var spr2 = shaftSprite(sk.rgb);
+          if (!spr2) continue;
+          var breathe2 = 0.55 + 0.45 * Math.sin(sk.ph);
+          ctx.globalAlpha = sk.a * breathe2;
+          ctx.save();
+          ctx.translate(sk.x, 0);
+          ctx.rotate(sk.deg * Math.PI / 180);
+          ctx.drawImage(spr2, -sk.wd / 2, -sk.ht * 0.25, sk.wd, sk.ht);
+          ctx.restore();
+          ctx.globalAlpha = 1;
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      }
 
       // 极光帘幕：最底层，几道慢慢漂移的柔光柱（全部用预渲染精灵，零渐变创建）
       if (aurora.length) {
@@ -606,23 +672,63 @@
         ctx.fill();
       }
 
-      // 按住拖动画出的星屑：各自呼吸着淡出
-      // 之前 decay 0.012/帧 -> 1.4 秒就没了，肉眼几乎注意不到（实测拖拽后绘制量只 +15%）。
-      // 现在放慢到约 4~5 秒，并加大光晕，让"星星跟着手走"真的看得见。
+      // 按住拖动画出的星屑
+      // 关键改动：不再只画"一堆独立光点"（实测那样太容易看不见），
+      // 而是把拖过的相邻两点连成一条光带 —— 丝带 + 高光 + 发亮的头部，
+      // 即使半透明也能一眼看出"星星跟着手走"。
       if (trail.length) {
+        // 先推进生命周期并清理过期的
         for (var tr = trail.length - 1; tr >= 0; tr--) {
           var tp = trail[tr];
-          tp.life -= 0.0030 * dt;      // 约 5.5 秒寿命，够看清整条轨迹
-          tp.ph += 0.075 * dt;
-          if (tp.life <= 0) { trail.splice(tr, 1); continue; }
-          var breath = 0.66 + 0.34 * Math.sin(tp.ph);
-          var talpha = tp.life * breath;
-          halo(palette(tp.hue), tp.x, tp.y, tp.r * 12, talpha * 1.35);
-          halo('255, 255, 255', tp.x, tp.y, tp.r * 4.2, talpha * 1.0);
+          tp.life -= 0.0028 * dt;        // 约 6 秒寿命
+          tp.ph += 0.07 * dt;
+          if (tp.life <= 0) trail.splice(tr, 1);
+        }
+
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // ① 光带主体：相邻点连线，越靠后越细越淡
+        for (var s1 = trail.length - 1; s1 > 0; s1--) {
+          var a1 = trail[s1], b1 = trail[s1 - 1];
+          var la = a1.life;
+          if (la <= 0) continue;
+          var dxs = b1.x - a1.x, dys = b1.y - a1.y;
+          if (dxs * dxs + dys * dys > 40000) continue;   // 跨度太大（换手/跳点）不连
+          // 外层柔光
+          ctx.strokeStyle = 'rgba(' + palette(a1.hue) + ', ' + (la * 0.30).toFixed(3) + ')';
+          ctx.lineWidth = (5 + a1.r * 2.4) * la;
+          ctx.beginPath();
+          ctx.moveTo(a1.x, a1.y);
+          ctx.lineTo(b1.x, b1.y);
+          ctx.stroke();
+          // 内层高光：白芯，让光带中间是亮的
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (la * 0.34).toFixed(3) + ')';
+          ctx.lineWidth = Math.max(0.7, (1.2 + a1.r * 0.55) * la);
+          ctx.beginPath();
+          ctx.moveTo(a1.x, a1.y);
+          ctx.lineTo(b1.x, b1.y);
+          ctx.stroke();
+        }
+
+        // ② 每个落点再点一颗星：光带有"颗粒感"，不只是平滑的线
+        for (var s2 = 0; s2 < trail.length; s2++) {
+          var tp2 = trail[s2];
+          if (tp2.life <= 0) continue;
+          var breath = 0.66 + 0.34 * Math.sin(tp2.ph);
+          var talpha = tp2.life * breath;
+          halo(palette(tp2.hue), tp2.x, tp2.y, tp2.r * 11, talpha * 1.25);
           ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, talpha * 1.5).toFixed(3) + ')';
           ctx.beginPath();
-          ctx.arc(tp.x, tp.y, tp.r * 0.58 * tp.life + 1.1, 0, Math.PI * 2);
+          ctx.arc(tp2.x, tp2.y, tp2.r * 0.5 * tp2.life + 1.2, 0, Math.PI * 2);
           ctx.fill();
+        }
+
+        // ③ 笔尖：最新那点的头部更亮，像一颗正在划过的流星
+        var tip = trail[trail.length - 1];
+        if (tip && tip.life > 0) {
+          halo('255, 255, 255', tip.x, tip.y, tip.r * 14, Math.min(1, tip.life * 1.1));
+          halo('255, 232, 168', tip.x, tip.y, tip.r * 8, Math.min(1, tip.life * 0.9));
         }
       }
       ctx.globalCompositeOperation = 'source-over';

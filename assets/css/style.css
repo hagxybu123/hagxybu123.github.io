@@ -1559,6 +1559,15 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
 .contact-item span { font-size: .86rem; color: var(--text-dim); }
 .contact-item:hover { transform: translateX(5px); border-color: var(--glass-bd-strong); background: rgba(120, 160, 255, .14); }
 
+/* ------------------------------------------------------------------
+   全局保护：hidden 属性必须真的隐藏元素。
+   浏览器默认样式里 [hidden]{display:none} 的优先级低于任何类选择器，
+   因此只要元素自身设了 display（如 .ai-panel{display:flex}），
+   hidden 就会失效 —— 表现为"面板一直显示、关闭按钮点了没反应"。
+   这是本站真实踩过的 bug（AI 面板 + 正在播放标签同时中招）。
+   ------------------------------------------------------------------ */
+[hidden] { display: none !important; }
+
 /* ------------------------------ AI 形象互动 ------------------------------ */
 .ai-dock {
   position: fixed;
