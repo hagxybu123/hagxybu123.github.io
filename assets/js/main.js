@@ -169,7 +169,8 @@
           vx: rnd(0.045, 0.14) * (Math.random() > 0.5 ? 1 : -1),
           ph: Math.random() * Math.PI * 2,
           sp: rnd(0.004, 0.011),
-          a: rnd(0.40, 0.72)
+          // 背景压暗后有了空间，极光可以更明显一点（氛围感主力）
+          a: rnd(0.58, 0.95)
         });
       }
 
@@ -221,20 +222,28 @@
       return c;
     }
 
-    function spawnComet() {
-      if (comets.length >= 5) return;
+    /* 流星：氛围感的主角。分两种——
+       big   : 长尾大流星，慢、亮、拖尾长，偶尔来一颗就够惊艳
+       small : 短促小流星，快、细、滑过即走，用来撑"流星雨"的密度
+       两者都走预渲染精灵画头部，拖尾用实心描边分段，零每帧渐变创建。 */
+    function spawnComet(force) {
+      if (comets.length >= 7) return;
+      var big = force === 'big' || (force !== 'small' && Math.random() < 0.34);
       var fromLeft = Math.random() > 0.35;
+      var ang = fromLeft ? rnd(0.28, 0.62) : rnd(Math.PI - 0.62, Math.PI - 0.28);
+      var roll = Math.random();
       comets.push({
-        x: fromLeft ? rnd(-w * 0.2, w * 0.55) : rnd(w * 0.5, w * 1.2),
-        y: rnd(-h * 0.05, h * 0.55),
-        ang: fromLeft ? rnd(0.28, 0.62) : rnd(Math.PI - 0.62, Math.PI - 0.28),
-        speed: rnd(7, 14),
-        len: rnd(140, 320),
+        x: fromLeft ? rnd(-w * 0.25, w * 0.6) : rnd(w * 0.45, w * 1.25),
+        y: rnd(-h * 0.08, h * 0.6),
+        ang: ang,
+        speed: big ? rnd(6, 10) : rnd(11, 20),
+        len: big ? rnd(280, 520) : rnd(90, 200),
         life: 1,
-        decay: rnd(0.004, 0.0085),
-        width: rnd(1.4, 3.2),
-        // 金色彗星占比提到约 40%，"金色星光"成为主视觉
-        hue: Math.random() > 0.6 ? 'gold' : 'ice'
+        decay: big ? rnd(0.0032, 0.0052) : rnd(0.0075, 0.014),
+        width: big ? rnd(2.0, 3.6) : rnd(1.0, 2.0),
+        // 金色约占四成，"金色星光"成为主视觉；大流星偏向金白
+        hue: roll > (big ? 0.52 : 0.62) ? 'gold' : (roll > 0.15 ? 'ice' : 'violet'),
+        big: big
       });
     }
 
@@ -508,9 +517,22 @@
         ctx.lineTo(tx, ty);
         ctx.stroke();
 
-        // 头部光晕：改用预渲染精灵
-        halo('255, 255, 255', cm.x, cm.y, 30, Math.min(1, 1.1 * cm.life));
-        halo(col2, cm.x, cm.y, 20, 0.62 * cm.life);
+        // 大流星额外加一层更宽的柔光，让拖尾有厚度（氛围感的关键）
+        if (cm.big) {
+          ctx.globalAlpha = 0.22 * cm.life;
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = cm.width * 3.4;
+          ctx.beginPath();
+          ctx.moveTo(cm.x, cm.y);
+          ctx.lineTo(tx, ty);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        // 头部光晕：预渲染精灵。大流星更亮更大
+        var headR = cm.big ? 46 : 26;
+        halo('255, 255, 255', cm.x, cm.y, headR, Math.min(1, (cm.big ? 1.25 : 1.0) * cm.life));
+        halo(col2, cm.x, cm.y, headR * 0.72, (cm.big ? 0.8 : 0.55) * cm.life);
 
         cm.x += dx * cm.speed * dt;
         cm.y += dy * cm.speed * dt;
@@ -602,12 +624,20 @@
       }
       ctx.globalCompositeOperation = 'source-over';
 
-      // 彗星节奏：平均 1.6~3.2 秒一颗，约七成概率同时来两颗
+      // 流星节奏：常态约 1.4~2.6 秒来一批，一批 1~2 颗；
+      // 另有一成概率触发"流星雨"——短时间连发 4~6 颗，其中一颗必为大流星。
       acc += rawDt;
       if (acc > cometAt) {
-        spawnComet();
-        if (Math.random() > 0.3) spawnComet();
-        cometAt = rnd(1600, 3200);
+        var shower = Math.random() < 0.1;
+        if (shower) {
+          var burst = 4 + Math.floor(Math.random() * 3);
+          for (var cb = 0; cb < burst; cb++) spawnComet(cb === 0 ? 'big' : 'small');
+          cometAt = rnd(2600, 4200);
+        } else {
+          spawnComet();
+          if (Math.random() > 0.42) spawnComet('small');
+          cometAt = rnd(1400, 2600);
+        }
         acc = 0;
       }
 
