@@ -22,6 +22,48 @@
     // Canvas 可用：淡出 CSS 静态星点兜底层
     document.documentElement.classList.add('sky-live');
 
+    /* ---- 光晕精灵缓存 ----------------------------------------------------
+       原来每颗星每帧都调用 createRadialGradient，560 颗星 = 每秒创建几万个
+       渐变对象，跑久了渲染管线会卡顿撕裂（表现为闪屏）。
+       改为把光晕预渲染成小图，之后只做 drawImage —— 快几十倍。            */
+    var spriteCache = {};
+    function glowSprite(rgb, size) {
+      var key = rgb + '|' + size;
+      var s = spriteCache[key];
+      if (s) return s;
+      var c = document.createElement('canvas');
+      var d = size * 2;
+      c.width = d;
+      c.height = d;
+      var g = c.getContext('2d');
+      if (!g) return null;
+      var grd = g.createRadialGradient(size, size, 0, size, size, size);
+      grd.addColorStop(0, 'rgba(' + rgb + ', 1)');
+      grd.addColorStop(0.42, 'rgba(' + rgb + ', 0.34)');
+      grd.addColorStop(1, 'rgba(' + rgb + ', 0)');
+      g.fillStyle = grd;
+      g.beginPath();
+      g.arc(size, size, size, 0, Math.PI * 2);
+      g.fill();
+      spriteCache[key] = c;
+      return c;
+    }
+
+    // 把光晕裁成只含 alpha 的白色贴图，绘制时用 globalAlpha 控强度，
+    // 这样同一种色相所有星点共用一张图。
+    function halo(rgb, x, y, r, alpha) {
+      var size = 64;
+      var spr = glowSprite(rgb, size);
+      if (!spr) return;
+      var prev = ctx.globalCompositeOperation;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+      var d = size * 2;
+      ctx.drawImage(spr, x - r, y - r, r * 2, r * 2);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = prev;
+    }
+
     var stars = [];
     var dust = [];
     var drift = [];
@@ -138,6 +180,10 @@
 
     // 点击爆开：星环冲击波 + 中心闪光 + 四散金蓝星火
     function addSpark(x, y) {
+      // 粒子总量上限：狂点也不至于把渲染拖垮（闪屏的另一诱因）
+      if (sparks.length > 420) sparks.splice(0, sparks.length - 420);
+      if (rings.length > 24) rings.splice(0, rings.length - 24);
+
       // ① 三道扩散星环，速度与粗细各异，形成冲击波层次
       rings.push({ x: x, y: y, life: 1, r: 0, grow: rnd(4.6, 6.2), decay: rnd(0.016, 0.022), w: 3.2, hue: 'gold' });
       rings.push({ x: x, y: y, life: 1, r: 10, grow: rnd(3.0, 4.0), decay: rnd(0.020, 0.027), w: 2.0, hue: 'ice' });
@@ -163,11 +209,41 @@
       }
     }
 
+    // 自适应画质：连续掉帧就减少星点数量，避免长时间停留后卡顿/闪屏
+    var slowStreak = 0, quality = 1;
+    // 帧率上限：15ms 约等于 60fps，只用于拦住 120Hz 高刷屏的翻倍负载，
+    // 不能设太高，否则 60Hz 屏幕会被整帧跳过（画面反而卡）。
+    var FRAME_FLOOR = 15;
+
     function frame(ts) {
       if (!last) last = ts;
       var rawDt = ts - last;
+
+      // 帧率上限：不到 21ms 就跳过这一帧，降低 GPU 持续负载
+      if (rawDt < FRAME_FLOOR) {
+        frameId = window.requestAnimationFrame(frame);
+        return;
+      }
       last = ts;
       var dt = rawDt > 50 ? 2 : rawDt / 16.67;
+
+      // 连续 90 帧耗时过长 -> 降级一次（最多降 3 档，每次减 25% 星点）
+      if (rawDt > 34) {
+        slowStreak++;
+        if (slowStreak > 90 && quality > 0.35) {
+          quality -= 0.25;
+          slowStreak = 0;
+          var keep = Math.max(40, Math.round(stars.length * quality));
+          if (keep < stars.length) stars.length = keep;
+          var keepDrift = Math.max(20, Math.round(drift.length * quality));
+          if (keepDrift < drift.length) drift.length = keepDrift;
+          if (window.console && console.info) {
+            console.info('[星庭] 检测到持续掉帧，已自动降低星空密度到 ' + Math.round(quality * 100) + '%');
+          }
+        }
+      } else if (slowStreak > 0) {
+        slowStreak--;
+      }
 
       ctx.clearRect(0, 0, w, h);
 
@@ -228,17 +304,21 @@
         if (ds.y > h + 14) ds.y = -12;
 
         var dcol = palette(ds.hue);
-        // 沿运动方向拉出短拖尾，一眼能看出"在移动"
+        // 拖尾：原来每颗每帧新建线性渐变（130 个/帧），改为两段实心描边
         var tl = 2.6 + Math.abs(ds.vx) * 7;
-        var dg = ctx.createLinearGradient(ds.x, ds.y, ds.x - ds.vx * tl, ds.y - ds.vy * tl);
-        dg.addColorStop(0, 'rgba(' + dcol + ', ' + (ds.a * 0.85).toFixed(3) + ')');
-        dg.addColorStop(1, 'rgba(' + dcol + ', 0)');
-        ctx.strokeStyle = dg;
-        ctx.lineWidth = ds.r * 0.85;
+        var tailX = ds.x - ds.vx * tl, tailY = ds.y - ds.vy * tl;
         ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(' + dcol + ', ' + (ds.a * 0.22).toFixed(3) + ')';
+        ctx.lineWidth = ds.r * 0.7;
         ctx.beginPath();
         ctx.moveTo(ds.x, ds.y);
-        ctx.lineTo(ds.x - ds.vx * tl, ds.y - ds.vy * tl);
+        ctx.lineTo(tailX, tailY);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(' + dcol + ', ' + (ds.a * 0.55).toFixed(3) + ')';
+        ctx.lineWidth = ds.r * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(ds.x, ds.y);
+        ctx.lineTo((ds.x + tailX) / 2, (ds.y + tailY) / 2);
         ctx.stroke();
 
         // 星点本体 + 白芯
@@ -275,16 +355,9 @@
 
         ctx.globalCompositeOperation = 'lighter';
 
-        // ① 外层彩色光晕：整片星空发光的来源
+        // ① 外层彩色光晕：改用预渲染精灵（原来每帧新建渐变，是闪屏主因）
         var glowR = radius * (st.flare ? 9 : 5);
-        var gg = ctx.createRadialGradient(st.x, y, 0, st.x, y, glowR);
-        gg.addColorStop(0, 'rgba(' + col + ', ' + (alpha * 0.55).toFixed(3) + ')');
-        gg.addColorStop(0.45, 'rgba(' + col + ', ' + (alpha * 0.18).toFixed(3) + ')');
-        gg.addColorStop(1, 'rgba(' + col + ', 0)');
-        ctx.fillStyle = gg;
-        ctx.beginPath();
-        ctx.arc(st.x, y, glowR, 0, Math.PI * 2);
-        ctx.fill();
+        halo(col, st.x, y, glowR, alpha * 0.55);
 
         // ② 十字星芒
         if (st.flare) {
@@ -338,15 +411,9 @@
         ctx.lineTo(tx, ty);
         ctx.stroke();
 
-        // 头部光晕（外圈放大，形成明显的发光头部）
-        var hg = ctx.createRadialGradient(cm.x, cm.y, 0, cm.x, cm.y, 26);
-        hg.addColorStop(0, 'rgba(255, 255, 255, ' + Math.min(1, 1.1 * cm.life).toFixed(3) + ')');
-        hg.addColorStop(0.35, 'rgba(' + col2 + ', ' + (0.62 * cm.life).toFixed(3) + ')');
-        hg.addColorStop(1, 'rgba(' + col2 + ', 0)');
-        ctx.fillStyle = hg;
-        ctx.beginPath();
-        ctx.arc(cm.x, cm.y, 26, 0, Math.PI * 2);
-        ctx.fill();
+        // 头部光晕：改用预渲染精灵
+        halo('255, 255, 255', cm.x, cm.y, 30, Math.min(1, 1.1 * cm.life));
+        halo(col2, cm.x, cm.y, 20, 0.62 * cm.life);
 
         cm.x += dx * cm.speed * dt;
         cm.y += dy * cm.speed * dt;
@@ -361,16 +428,10 @@
         if (rn.life <= 0) { rings.splice(rg, 1); continue; }
 
         if (rn.hue === 'flash') {
-          // 中心闪光：一团快速衰减的白色光球
+          // 中心闪光：改用预渲染精灵
           var fl = rn.life;
-          var fg2 = ctx.createRadialGradient(rn.x, rn.y, 0, rn.x, rn.y, 74 * fl);
-          fg2.addColorStop(0, 'rgba(255, 255, 255, ' + Math.min(1, fl * 1.1).toFixed(3) + ')');
-          fg2.addColorStop(0.35, 'rgba(255, 236, 190, ' + (fl * 0.65).toFixed(3) + ')');
-          fg2.addColorStop(1, 'rgba(255, 220, 160, 0)');
-          ctx.fillStyle = fg2;
-          ctx.beginPath();
-          ctx.arc(rn.x, rn.y, 74 * fl, 0, Math.PI * 2);
-          ctx.fill();
+          halo('255, 255, 255', rn.x, rn.y, 74 * fl, Math.min(1, fl * 1.1));
+          halo('255, 236, 190', rn.x, rn.y, 96 * fl, fl * 0.65);
           continue;
         }
 
