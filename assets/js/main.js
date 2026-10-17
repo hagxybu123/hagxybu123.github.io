@@ -12,15 +12,55 @@
   // 共用的随机数工具（星野与开场页漩涡都要用）
   var rnd = function (a, b) { return a + Math.random() * (b - a); };
 
+  /* ---------------------------------------------------------------- 自检
+     用于把"页面到底跑成什么样"直接暴露给用户，而不是靠猜或控制台。
+     skyCtx / skyCanvas 由 initSky 填入，供 drawSelfCheck 读取真实像素。 */
+  var skyCtx = null, skyCanvas = null;
+  var skyNotes = [];
+  function skyNote(msg) {
+    skyNotes.push(msg);
+    try {
+      var st = document.getElementById('buildStamp');
+      if (st) st.textContent = 'v5 · 2026-10-16 · ⚠ ' + msg;
+    } catch (e) {}
+  }
+
+  /* 读取画布真实像素，判断星空是否真的画出来了。
+     这是最可靠的判据：CSS 与 DOM 都可能"看起来正常"，但画布可以是全黑的。 */
+  function drawSelfCheck() {
+    var res = { stars: 0, sky: false, note: '' };
+    try {
+      if (!skyCtx || !skyCanvas) { res.note = '画布未初始化'; return res; }
+      var w = skyCanvas.width, h = skyCanvas.height;
+      if (!w || !h) { res.note = '画布尺寸为 0'; return res; }
+      var data = skyCtx.getImageData(0, 0, w, h).data;
+      var bright = 0, total = 0;
+      // 抽样：每隔 4 个像素取一个，统计非黑像素比例
+      for (var i = 0; i < data.length; i += 4 * 17) {
+        total++;
+        if (data[i] + data[i + 1] + data[i + 2] > 60) bright++;
+      }
+      res.stars = total ? Math.round((bright / total) * 1000) / 10 : 0;
+      res.sky = res.stars > 0.3;
+      res.note = res.sky ? '星空已绘制（亮像素 ' + res.stars + '%）' : '画布几乎是黑的';
+    } catch (e) {
+      // getImageData 可能因跨域绘制被拒；本项目自绘精灵，不应发生
+      res.note = '无法读取画布像素：' + (e && e.name ? e.name : '未知');
+    }
+    return res;
+  }
+
   /* ---------------------------------------------------------------- 星野 */
   function initSky() {
     var canvas = $('#sky');
-    if (!canvas) return;
+    if (!canvas) { skyNote('找不到画布元素'); return; }
     var ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) { skyNote('浏览器未能创建 2D 画布上下文'); return; }
 
     // Canvas 可用：淡出 CSS 静态星点兜底层
     document.documentElement.classList.add('sky-live');
+    skyCtx = ctx;
+    skyCanvas = canvas;
 
     /* 精灵缓存必须在最前面声明并赋值：palette() 与 auroraSprite() 在文件更早的
        位置就会被调用，而 var 只提升声明不提升赋值——放后面会静默拿到 undefined。 */
@@ -2029,21 +2069,23 @@
        ------------------------------------------------------------------ */
     try {
       var stamp = $('#buildStamp');
-      if (stamp) {
-        var reduced = reduceMotion;
-        var canvasOk = !!document.createElement('canvas').getContext;
-        var notes = [];
-        if (reduced) notes.push('⚠ 系统开启了"减少动态效果"，动画已停用');
-        if (!canvasOk) notes.push('⚠ 浏览器不支持 Canvas');
-        stamp.textContent = 'v5 · 2026-10-16' + (notes.length ? ' · ' + notes.join(' · ') : ' · 动画已启动');
-      }
-      // 兼容旧标记
       var tag = document.querySelector ? document.querySelector('.build-tag') : null;
-      if (tag) tag.textContent = '版本 v5 · 2026-10-16' + (reduceMotion ? '（减少动效）' : '');
 
-      /* 版本也写进标题栏：标题栏在任何滚动位置都可见，
-         是确认"有没有加载到最新版"最省事的地方。 */
-      document.title = '天逸 · 星庭 [v5]' + (reduceMotion ? '（减少动效：动画已停用）' : '');
+      // 启动后稍等一下再读画布像素（等第一帧画完）
+      window.setTimeout(function () {
+        try {
+          var chk = drawSelfCheck();
+          var parts = ['v5 · 2026-10-16'];
+          if (reduceMotion) parts.push('⚠ 系统开启了"减少动态效果"，动画已停用');
+          else parts.push('动画已启动');
+          parts.push(chk.note);
+          if (skyNotes.length) parts.push(skyNotes.join('；'));
+          var line = parts.join(' · ');
+          if (stamp) stamp.textContent = line;
+          if (tag) tag.textContent = line;
+          document.title = '天逸 · 星庭 [v5]' + (chk.sky ? ' · 星空正常' : ' · ⚠ ' + chk.note);
+        } catch (e) {}
+      }, 900);
     } catch (e) {}
 
     // Anything still hidden after boot gets revealed no matter what.
