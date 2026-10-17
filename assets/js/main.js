@@ -2022,6 +2022,30 @@
       }
     }
 
+    /* ------------------------------------------------------------------
+       启动自检：把"脚本到底跑起来没有"直接写在左下角的标记上。
+       这一步专门用来排查"用户看到的是静态页面"这类问题 ——
+       若提示减少动效，动画循环不会启动，星环/拖拽/流星都不会出现。
+       ------------------------------------------------------------------ */
+    try {
+      var stamp = $('#buildStamp');
+      if (stamp) {
+        var reduced = reduceMotion;
+        var canvasOk = !!document.createElement('canvas').getContext;
+        var notes = [];
+        if (reduced) notes.push('⚠ 系统开启了"减少动态效果"，动画已停用');
+        if (!canvasOk) notes.push('⚠ 浏览器不支持 Canvas');
+        stamp.textContent = 'v5 · 2026-10-16' + (notes.length ? ' · ' + notes.join(' · ') : ' · 动画已启动');
+      }
+      // 兼容旧标记
+      var tag = document.querySelector ? document.querySelector('.build-tag') : null;
+      if (tag) tag.textContent = '版本 v5 · 2026-10-16' + (reduceMotion ? '（减少动效）' : '');
+
+      /* 版本也写进标题栏：标题栏在任何滚动位置都可见，
+         是确认"有没有加载到最新版"最省事的地方。 */
+      document.title = '天逸 · 星庭 [v5]' + (reduceMotion ? '（减少动效：动画已停用）' : '');
+    } catch (e) {}
+
     // Anything still hidden after boot gets revealed no matter what.
     window.setTimeout(function () {
       $$('[data-reveal]').forEach(function (el) {
