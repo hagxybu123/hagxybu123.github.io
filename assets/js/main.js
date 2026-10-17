@@ -39,6 +39,23 @@
     } catch (e) {}
   }
 
+  /* 强制把星空画一帧，再读像素。
+     为什么必须这样：开场页（.entry，z-index 200）盖住全屏期间，
+     我在 CSS 里把星空 canvas 的动画暂停了（body.is-locked #sky）。
+     自检在启动后 900ms 运行，那时开场页还在，画布自然是一片空白 ——
+     之前的版本因此把【正常的画布】误判为"全黑/坏掉"，
+     进而错误地启用了 CSS 星层（而 CSS 星层才是后来主页闪烁的来源）。
+     现在改为：先主动画一帧，再采样，判据才成立。
+     绘制函数由 initSky 通过 skyForceDraw 暴露（见该函数的赋值处）。 */
+  var skyForceDraw = null;
+
+  function forceSkyFrame() {
+    if (typeof skyForceDraw === 'function') {
+      try { skyForceDraw(); return true; } catch (e) { return false; }
+    }
+    return false;
+  }
+
   /* 读取画布真实像素，判断星空是否真的画出来了。
      判据说明：不能用"亮像素占比" —— 2px 的星点在 1600x900 画布上占比极低，
      正常的星空也会被判成"几乎是黑的"（本项目真的误判过一次）。
@@ -50,6 +67,8 @@
       if (!skyCtx || !skyCanvas) { res.note = '画布未初始化'; return res; }
       var w = skyCanvas.width, h = skyCanvas.height;
       if (!w || !h) { res.note = '画布尺寸为 0'; return res; }
+      // 关键：先确保画布上真的有一帧内容，否则会把"暂停中"误判成"坏掉"
+      forceSkyFrame();
       var data = skyCtx.getImageData(0, 0, w, h).data;
       var hist = new Array(256).fill(0);
       var total = 0;
@@ -86,6 +105,15 @@
     document.documentElement.classList.add('sky-live');
     skyCtx = ctx;
     skyCanvas = canvas;
+    /* 把"强制画一帧"的能力暴露给自检。
+       自检需要在开场页还盖着屏幕（此时动画被 CSS 暂停）时也能拿到真实像素，
+       否则会把正常的画布误判成坏掉。传 ts = last + 16.7 相当于推进一帧。 */
+    skyForceDraw = function () {
+      try {
+        skyForce = true;
+        frame((last || 0) + 16.7);
+      } catch (e) { skyForce = false; }
+    };
 
     /* 精灵缓存必须在最前面声明并赋值：palette() 与 auroraSprite() 在文件更早的
        位置就会被调用，而 var 只提升声明不提升赋值——放后面会静默拿到 undefined。 */
@@ -435,7 +463,18 @@
     // 手机上放宽到 12ms，避免与 60Hz 刷新周期打架导致偶发跳帧（那也是"闪"的来源之一）。
     var FRAME_FLOOR = isMobileDevice ? 12 : 15;
 
+    /* 自检用的"只画一帧"标记：为 true 时 frame() 跳过帧率闸门画一帧，
+       且不续订 requestAnimationFrame —— 不会把暂停中的动画重新拉起。 */
+    var skyForce = false;
+
     function frame(ts) {
+      if (skyForce) {
+        skyForce = false;
+        last = ts;
+        drawFrame(1, 16.7);
+        return;
+      }
+
       if (!last) last = ts;
       var rawDt = ts - last;
 
@@ -465,6 +504,15 @@
         slowStreak--;
       }
 
+      drawFrame(dt, rawDt);
+    }
+
+    /* 单帧绘制。抽出来是为了让自检能在"动画被暂停"时也画出一帧真实内容 ——
+       否则自检会在开场页盖屏期间读到空白画布，把正常的画布误判成坏掉。
+       msDelta 是真实毫秒增量（用于累积彗星/星尘的生成计时），
+       dt 是归一化后的帧步长（1 = 一帧 16.67ms，用于运动量）。 */
+    function drawFrame(dt, msDelta) {
+      var rawDt = msDelta || 16.7;
       ctx.clearRect(0, 0, w, h);
 
       // 深空漫射光柱：斜向柔光缓慢明灭，最底层
@@ -845,6 +893,8 @@
         acc = 0;
       }
 
+      // 画完一帧就排下一帧。放在 drawFrame 末尾而不是 frame 末尾，
+      // 是为了让任何调用方（自检的强制绘制、点击后的立即重绘）都能自然续上动画。
       frameId = window.requestAnimationFrame(frame);
     }
 
