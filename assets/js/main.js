@@ -1010,6 +1010,99 @@
     });
   }
 
+  /* ------------------------------------------------------------- 背景音乐 */
+  function initMusic() {
+    var audio = $('#bgm');
+    if (!audio) return;
+
+    var btn = $('#musicBtn');
+    var entryBtn = $('#entryMusic');
+    var label = $('#nowPlaying');
+    var missingTip = null;
+    var STORE = 'tianyi-bgm';
+    var broken = false;
+
+    function paint(playing) {
+      if (btn) {
+        btn.classList.toggle('is-playing', playing);
+        btn.setAttribute('aria-pressed', String(playing));
+        btn.setAttribute('aria-label', playing ? '暂停背景音乐' : '播放背景音乐');
+      }
+      if (entryBtn) {
+        entryBtn.classList.toggle('is-on', playing);
+        entryBtn.setAttribute('aria-pressed', String(playing));
+        var txt = entryBtn.querySelector('.em-text');
+        if (txt) txt.textContent = playing ? '正在播放「英雄」' : '播放「英雄」· 奥特曼传奇';
+      }
+      if (label) label.hidden = !playing;
+    }
+
+    function showMissingTip() {
+      if (missingTip || broken) return;
+      broken = true;
+      if (btn) btn.classList.add('is-error');
+      if (entryBtn) entryBtn.classList.add('is-error');
+      var tip = document.createElement('div');
+      tip.className = 'audio-missing-tip';
+      tip.innerHTML = '还没有音频文件：把歌曲放到 <code>assets/audio/hero.mp3</code> 就会响。<br>' +
+        '（有版权的商业歌曲不能随站公开分发，所以需要你自己放进去）';
+      document.body.appendChild(tip);
+      missingTip = tip;
+      window.setTimeout(function () {
+        if (tip.parentNode) tip.parentNode.removeChild(tip);
+        missingTip = null;
+      }, 9000);
+    }
+
+    function play() {
+      var p = audio.play();
+      if (p && typeof p.catch === 'function') {
+        p.then(function () {
+          paint(true);
+          try { localStorage.setItem(STORE, '1'); } catch (e) {}
+        }).catch(function () {
+          paint(false);
+          showMissingTip();
+        });
+      } else {
+        paint(true);
+      }
+    }
+
+    function pause() {
+      try { audio.pause(); } catch (e) {}
+      paint(false);
+      try { localStorage.setItem(STORE, '0'); } catch (e) {}
+    }
+
+    function toggle(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      if (audio.paused) play(); else pause();
+    }
+
+    audio.addEventListener('error', showMissingTip);
+    audio.addEventListener('play', function () { paint(true); });
+    audio.addEventListener('pause', function () { paint(false); });
+
+    if (btn) btn.addEventListener('click', toggle);
+    if (entryBtn) entryBtn.addEventListener('click', toggle);
+
+    // 用户上次选择过播放，就在首次交互时自动起播（浏览器要求手势后才能播放）
+    var want = false;
+    try { want = localStorage.getItem(STORE) === '1'; } catch (e) {}
+    if (want) {
+      var kick = function () {
+        document.removeEventListener('pointerdown', kick);
+        document.removeEventListener('keydown', kick);
+        play();
+      };
+      document.addEventListener('pointerdown', kick, { once: true });
+      document.addEventListener('keydown', kick, { once: true });
+    }
+
+    paint(false);
+  }
+
   /* --------------------------------------------------------------- 启动 */
   function boot() {
     // Mark that JS is alive. CSS only hides [data-reveal] elements under
@@ -1026,6 +1119,7 @@
       ['打字机', initTyping],
       ['立绘倾斜', initTilt],
       ['留言板', initGuestbook],
+      ['背景音乐', initMusic],
       ['开场页', initEntry],
       ['进入按钮', initEnterButton]
     ];

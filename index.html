@@ -55,6 +55,10 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
     </button>
     <p class="entry-hint">也可以直接点击页面任意位置</p>
+    <button class="entry-music" id="entryMusic" type="button" aria-pressed="false">
+      <span class="em-icon" aria-hidden="true">♪</span>
+      <span class="em-text">播放「英雄」· 奥特曼传奇</span>
+    </button>
   </div>
 </div>
 
@@ -95,6 +99,12 @@
     </nav>
 
     <div class="nav-tools">
+      <button id="musicBtn" class="icon-btn music-btn" type="button" aria-label="播放背景音乐" aria-pressed="false" title="背景音乐：英雄（奥特曼传奇）">
+        <span class="disc" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 7.5A1.5 1.5 0 1 1 12 13.5 1.5 1.5 0 0 1 12 10.5Z"/></svg>
+        </span>
+        <span class="bar" aria-hidden="true"><i></i><i></i><i></i></span>
+      </button>
       <button id="themeBtn" class="icon-btn" type="button" aria-label="切换亮色 / 暗色主题" title="切换主题">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/></svg>
       </button>
@@ -103,6 +113,17 @@
       </button>
     </div>
   </div>
+
+  <!-- 背景音乐：音频文件请放到 assets/audio/hero.mp3。
+       版权提示：商业歌曲（如电影插曲）不能随站公开分发，
+       这里只提供播放器，音频由站主自行放入。 -->
+  <audio id="bgm" loop preload="none">
+    <source src="assets/audio/hero.mp3" type="audio/mpeg">
+  </audio>
+  <p class="now-playing" id="nowPlaying" aria-live="polite" hidden>
+    <span class="np-note" aria-hidden="true">♪</span>
+    <b>英雄</b><span class="np-sub">奥特曼传奇 · 插曲</span>
+  </p>
 </header>
 
 <main id="main">
