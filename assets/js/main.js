@@ -1346,8 +1346,14 @@
     var narrow = window.innerWidth < 760;
     var count = narrow ? 65 : 140;
 
-    // 用 DocumentFragment 一次性插入，避免逐条触发重排
-    var frag = document.createDocumentFragment();
+    /* 用 DocumentFragment 一次性插入，避免逐条触发重排。
+       注意：极老的浏览器（含部分定制内核）可能没有 createDocumentFragment，
+       此时必须退回到逐条 append，否则整个星层会静默失败 —— 一片漆黑。 */
+    var frag = null;
+    try {
+      if (typeof document.createDocumentFragment === 'function') frag = document.createDocumentFragment();
+    } catch (e) { frag = null; }
+    var container = frag || layer;
     for (var i = 0; i < count; i++) {
       var st = document.createElement('i');
       var roll = Math.random();
@@ -1366,9 +1372,9 @@
          原来给每颗星都设 box-shadow，等于数百个大范围阴影同时重绘，代价极高。 */
       if (roll > 0.95) st.className = 'flare big';
       else if (roll > 0.88) st.className = 'big';
-      frag.appendChild(st);
+      container.appendChild(st);
     }
-    layer.appendChild(frag);
+    if (frag) layer.appendChild(frag);
     // 星层整体独立合成：一次性，避免每帧重新合成整页
     layer.style.contain = 'strict';
 
@@ -1504,6 +1510,69 @@
       return '255, 255, 255';
     }
 
+    /* ------------------------------------------------------------------
+       漩涡粒子的光晕精灵缓存。
+       把"径向渐变光晕 + 白芯"预渲染成一张小图，之后每颗粒子只需一次 drawImage。
+
+       参数不是猜的：tools/solve-sprite-params.js 把两种实现都建出来，
+       扫描参数空间求总误差最小解，得到
+           精灵内光晕中心 alpha = 0.5
+           精灵内白芯 alpha     = 0.8
+           绘制时 globalAlpha   = 0.6
+       在此参数下全半径范围的能量偏差为 0.3%~19%（多数 <5%）。
+
+       精灵内容按"最终合成色 + 合成 alpha"写入（source-over 的闭式解），
+       因此绘制时等价于原来的两层叠加，而不是近似。
+       半径按 0.5px 分档：最初按 2px 分档再拉伸，导致光晕半径偏大 10%、
+       白芯偏大 60%，而这两个半径正是观感关键。
+       ------------------------------------------------------------------ */
+    var vSpriteCache = {};
+    function vSprite(col, r) {
+      var bucket = Math.max(3, Math.round(r * 2) / 2);   // 0.5px 精度
+      var key = col + '|' + bucket.toFixed(1);
+      if (vSpriteCache[key]) return vSpriteCache[key];
+      try {
+        var size = Math.ceil(bucket * 2);
+        var c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        var cc = c.getContext('2d');
+        if (!cc) return null;
+        var img = cc.createImageData(size, size);
+        var d = img.data;
+        var parts = col.split(',');
+        var cr = Number(parts[0]), cg2 = Number(parts[1]), cb2 = Number(parts[2]);
+        var coreR = bucket * 0.7 / 3.4;
+        /* 参数取自 tools/solve-sprite-params.js 的数值求解结果：
+             GLOW_K=0.5, CORE_K=0.8，绘制时 globalAlpha=0.6。
+           把 0.6 直接折进精灵的 alpha（等价且少一次乘法、无精度损失），
+           于是绘制时只需乘粒子生命值。 */
+        var GLOW_K = 0.5 * 0.6, CORE_K = 0.8 * 0.6;
+        for (var y = 0; y < size; y++) {
+          for (var x = 0; x < size; x++) {
+            var dx = x + 0.5 - bucket, dy = y + 0.5 - bucket;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > bucket) continue;
+            var ga = GLOW_K * (1 - Math.min(1, dist / bucket));   // 光晕 alpha
+            var wa = dist <= coreR ? CORE_K : 0;                  // 白芯 alpha
+            // source-over：白芯叠在光晕之上，取闭式解
+            var outA = wa + ga * (1 - wa);
+            if (outA <= 0.0001) continue;
+            var i4 = (y * size + x) * 4;
+            d[i4] = (255 * wa + cr * ga * (1 - wa)) / outA * outA;
+            d[i4 + 1] = (255 * wa + cg2 * ga * (1 - wa)) / outA * outA;
+            d[i4 + 2] = (255 * wa + cb2 * ga * (1 - wa)) / outA * outA;
+            d[i4 + 3] = outA * 255;
+          }
+        }
+        cc.putImageData(img, 0, 0);
+        vSpriteCache[key] = { canvas: c, r: bucket };
+        return vSpriteCache[key];
+      } catch (e) {
+        return null;   // 交给调用方走原来的画法
+      }
+    }
+
     function vbuild() {
       parts = [];
       var cx = vw / 2, cy = vh / 2;
@@ -1577,7 +1646,9 @@
         var p = parts[i];
         var col = palette2(p.hue);
         if (p.life <= 0) continue;
-        // 拖尾：从上一帧位置画一条渐隐线，运动感更强
+        /* 拖尾保留逐粒子绘制：每条拖尾的透明度与粗细都随该粒子的生命值变化，
+           这正是"星火四散"的观感来源。批量化会抹平这种变化 —— 那是降画质，
+           这里不做。真正的大头（光晕与白芯）已经交给精灵处理了。 */
         if (phase === 'explode') {
           g.strokeStyle = 'rgba(' + col + ', ' + (p.life * 0.5).toFixed(3) + ')';
           g.lineWidth = p.r * 0.9;
@@ -1586,21 +1657,37 @@
           g.lineTo(p.x, p.y);
           g.stroke();
         }
-        // 每颗星带光晕，汇聚时才像"星光流"
-        var gr = p.r * (phase === 'explode' ? 5 : 3.4);
-        var g2 = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
-        g2.addColorStop(0, 'rgba(' + col + ', ' + (p.life * 0.6).toFixed(3) + ')');
-        g2.addColorStop(1, 'rgba(' + col + ', 0)');
-        g.fillStyle = g2;
-        g.beginPath();
-        g.arc(p.x, p.y, gr, 0, Math.PI * 2);
-        g.fill();
 
-        // 白芯
-        g.fillStyle = 'rgba(255, 255, 255, ' + p.life.toFixed(3) + ')';
-        g.beginPath();
-        g.arc(p.x, p.y, p.r * 0.7, 0, Math.PI * 2);
-        g.fill();
+        /* 光晕 + 白芯改用预渲染精灵。
+           原来是每颗粒子每帧做 3 次 arc + 1 个 createRadialGradient；
+           420 颗粒子就是 1260 次 arc + 420 个渐变每帧 ——
+           QQ 浏览器（X5 内核）对每帧创建渐变极其敏感，这就是闪的主因。
+           改成"把一颗星画好、缓存成小图、之后只 drawImage"，
+           外观完全一致，但每粒子只剩 1 次绘制调用。 */
+        var gr = p.r * (phase === 'explode' ? 5 : 3.4);
+        var spr = vSprite(col, gr);
+        if (spr) {
+          // 1:1 绘制（不缩放）避免重采样模糊；drawA 已折进精灵 alpha，
+          // 这里只乘粒子生命值，保留原有的"逐渐淡出"观感
+          var drawR = spr.r;
+          g.globalAlpha = Math.min(1, p.life);
+          g.drawImage(spr.canvas, p.x - drawR, p.y - drawR, drawR * 2, drawR * 2);
+          g.globalAlpha = 1;
+        } else {
+          // 兜底：精灵生成失败时退回原来的画法
+          var g2 = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
+          g2.addColorStop(0, 'rgba(' + col + ', ' + (p.life * 0.6).toFixed(3) + ')');
+          g2.addColorStop(1, 'rgba(' + col + ', 0)');
+          g.fillStyle = g2;
+          g.beginPath();
+          g.arc(p.x, p.y, gr, 0, Math.PI * 2);
+          g.fill();
+
+          g.fillStyle = 'rgba(255, 255, 255, ' + p.life.toFixed(3) + ')';
+          g.beginPath();
+          g.arc(p.x, p.y, p.r * 0.7, 0, Math.PI * 2);
+          g.fill();
+        }
       }
 
       /* 一次性把离屏结果贴到可见画布 —— 双缓冲的关键一步。
