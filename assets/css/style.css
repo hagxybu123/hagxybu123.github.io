@@ -2047,6 +2047,14 @@ html.js-ready [data-reveal].is-in { opacity: 1; transform: none; animation: none
 /* 只有 canvas 不可用时才显示（由 JS 给 html 加 .use-css-stars） */
 html.use-css-stars .css-stars { opacity: 1; }
 
+/* 未启用时【真正停掉】动画，而不只是透明。
+   opacity: 0 只省下绘制，浏览器仍要为每个元素推进动画、维护合成层 ——
+   在 canvas 正常的设备上这是纯浪费（实测隐藏状态下仍有 65 条动画在跑）。 */
+html:not(.use-css-stars) .css-stars,
+html:not(.use-css-stars) .css-stars * {
+  animation-play-state: paused !important;
+}
+
 /* 注意：这里刻意不写 will-change —— 几百个元素各自 will-change
    会让浏览器为每个元素创建独立合成层，层数爆炸反而更卡。
    同理不给每颗星加 box-shadow（数百个大范围阴影是重绘灾难）；
@@ -2056,6 +2064,10 @@ html.use-css-stars .css-stars { opacity: 1; }
   display: block;
   border-radius: 50%;
   background: #fff;
+  /* 每颗星各有一条 opacity 动画。
+     曾尝试改成"父层单条动画 + CSS 变量给相位"，但 CSS 自定义属性是继承的，
+     在元素上改变量会让浏览器重算整棵子树样式 —— 对几十个元素反而更慢，已回退。
+     而 opacity 动画本身运行在合成线程，并不是主页卡顿的原因。 */
   animation: css-twinkle linear infinite;
 }
 /* 只用 opacity：transform 虽然也是合成属性，
@@ -2106,7 +2118,12 @@ html.use-css-stars .css-stars { opacity: 1; }
   transform: translate(-50%, -50%) scale(.06);
   animation: css-ring-out 1.15s cubic-bezier(.16, .72, .28, 1) forwards;
   will-change: transform, opacity;
-  contain: strict;
+  /* 用 layout paint 而不是 strict：
+     strict 含 size containment，会让浏览器无视元素内容的尺寸 ——
+     而这里恰恰是"固定 520px 却用 transform 缩放"，
+     size containment 与 transform 缩放叠加会引入多余的尺寸重算。
+     layout paint 保留隔离收益，去掉这个副作用。 */
+  contain: layout paint;
 }
 @keyframes css-ring-out {
   0%   { transform: translate(-50%, -50%) scale(.06); opacity: .95; }
@@ -2117,4 +2134,89 @@ html.use-css-stars .css-stars { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .css-stars i { animation: none; opacity: .78; }
   .css-ring { animation-duration: .01s; }
+}
+
+/* ==================================================================
+   开场动画 · 纯 CSS 版本（QQ / X5 内核专用）
+   为什么需要它：真机实测发现 X5 内核对"动画 canvas"的合成不稳定，
+   即使做了双缓冲、精灵化、帧率上限、resize 防重分配，开场页的
+   canvas 漩涡依然会闪。既然优化解决不了，就在该内核下完全不使用
+   canvas —— 改为纯 CSS 关键帧，只要浏览器能渲染 CSS 就一定能稳定显示。
+   进入时只加一个 is-css-tear 类，之后 JS 不再参与任何绘制。
+   ================================================================== */
+
+/* 汇聚时整体轻微收缩 + 淡出，替代 canvas 的"吸入" */
+.entry.is-css-tear { animation: css-tear-out 1.5s cubic-bezier(.4, 0, .2, 1) forwards; }
+
+@keyframes css-tear-out {
+  0%   { opacity: 1; transform: scale(1); }
+  55%  { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+/* 中心光核：亮起 -> 炸开 */
+.entry.is-css-tear::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, .95) 0%,
+    rgba(200, 225, 255, .55) 38%,
+    rgba(150, 190, 255, 0) 72%);
+  animation: css-core-flash 1.5s ease-out forwards;
+}
+
+@keyframes css-core-flash {
+  0%   { transform: scale(.4); opacity: 0; }
+  40%  { transform: scale(1.1); opacity: 1; }
+  62%  { transform: scale(2.4); opacity: .9; }
+  100% { transform: scale(7); opacity: 0; }
+}
+
+/* 三道扩散光环（金色 / 冰蓝 / 白），对应 canvas 版的冲击波 */
+.entry.is-css-tear::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 226, 150, .9);
+  pointer-events: none;
+  z-index: 2;
+  animation: css-wave-out 1.5s cubic-bezier(.16, .72, .28, 1) forwards;
+}
+
+@keyframes css-wave-out {
+  0%   { transform: scale(.08); opacity: 0; }
+  45%  { opacity: .95; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* 标题与头像在汇聚时向内收，强化"被吸进去"的感觉 */
+.entry.is-css-tear .entry-inner {
+  animation: css-tear-inner 1.5s cubic-bezier(.4, 0, .2, 1) forwards;
+}
+
+@keyframes css-tear-inner {
+  0%   { transform: scale(1); opacity: 1; }
+  55%  { transform: scale(.94); opacity: .85; }
+  100% { transform: scale(.72); opacity: 0; }
+}
+
+/* 尊重"减少动态效果"：只做淡出，不做缩放与扩散 */
+@media (prefers-reduced-motion: reduce) {
+  .entry.is-css-tear { animation: none; opacity: 0; }
+  .entry.is-css-tear::before,
+  .entry.is-css-tear::after { animation: none; opacity: 0; }
+  .entry.is-css-tear .entry-inner { animation: none; opacity: 0; }
 }

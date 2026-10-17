@@ -9,6 +9,19 @@
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ------------------------------------------------------------------ 内核检测
+     QQ 内置浏览器使用腾讯 X5 内核（基于较老的 Chromium 定制）。
+     真机实测：即使已经做了双缓冲、精灵化、帧率上限、resize 防重分配，
+     开场页的 canvas 漩涡在 X5 下依然会闪。既然优化解决不了，
+     就干脆在 X5 下【不用 canvas 做开场动画】，换纯 CSS 版本 ——
+     只要浏览器能渲染 CSS，就一定能稳定显示。
+     只在 UA 明确命中时降级，其他浏览器完全不受影响。 */
+  /* 注意用 typeof 判断：直接写 navigator 在缺少该全局的对象里会抛
+     ReferenceError（连 && 短路都救不了，因为标识符解析阶段就失败）。 */
+  var ua = (typeof navigator !== 'undefined' && navigator && navigator.userAgent) || '';
+  var isX5 = /MQQBrowser|QQBrowser|QQ\/|TBS\/|X5JSCore/i.test(ua);
+
   // 共用的随机数工具（星野与开场页漩涡都要用）
   var rnd = function (a, b) { return a + Math.random() * (b - a); };
 
@@ -1382,8 +1395,14 @@
       container.appendChild(st);
     }
     if (frag) layer.appendChild(frag);
-    // 星层整体独立合成：一次性，避免每帧重新合成整页
-    layer.style.contain = 'strict';
+    /* 这里刻意【不】设置 contain: strict。
+       strict 等价于 size layout paint style，其中：
+         · size containment 会让浏览器无视元素内容的尺寸 ——
+           对一个 position:fixed + inset:0 的层来说本就有确定尺寸，属于误用，
+           还会引入额外的尺寸重算路径；
+         · layout containment 会让该层成为"包含块"，
+           改变内部 absolute 星星的定位基准，属于副作用。
+       这一层本来就铺满视口，隔离收益很小，去掉更稳。 */
 
     /* DOM 版星环：对象池复用 + 只做 transform 缩放。
        优化点：
@@ -1790,8 +1809,11 @@
     /* ------------------------------------------------------------ */
 
     var closed = false;
-    // 画布可用即可播放漩涡（粒子在点击时才生成，不能作为判断条件）
-    var canVortex = !!(vortex && vctx) && !reduceMotion;
+    /* 是否使用 canvas 漩涡（粒子在点击时才生成，不能作为判断条件）。
+       关键：X5 内核（QQ 内置浏览器）下【强制不使用】canvas 版本 ——
+       真机实测该内核对动画 canvas 的合成不稳定，即使用上双缓冲、精灵化、
+       帧率上限、resize 防重分配依然会闪。既然优化解决不了，就换纯 CSS 实现。 */
+    var canVortex = !!(vortex && vctx) && !reduceMotion && !isX5;
 
     function enter() {
       if (closed) return;
@@ -1804,12 +1826,20 @@
         phase = 'converge';
         phaseAt = Date.now();
         vframe();
+      } else if (isX5) {
+        /* X5 内核下不走 canvas 漩涡，改用纯 CSS 的"星光汇聚"：
+           只加一个类，动画全部由 CSS 关键帧完成，JS 不再参与任何绘制。
+           这是为了绕开 X5 无法稳定渲染动画 canvas 的问题。 */
+        entry.classList.add('is-sucking', 'is-css-tear');
       }
 
       try { sessionStorage.setItem('tianyi-entered', '1'); } catch (e) {}
 
-      var uiDelay = canVortex ? 1000 : 0;
-      var killDelay = canVortex ? 1900 : 820;
+      /* 时长：canvas 漩涡约 1.9s 收尾；X5 的 CSS 版本略短一些，
+         避免用户在开场页等太久。 */
+      var cssTear = isX5 && !canVortex;
+      var uiDelay = canVortex ? 1000 : (cssTear ? 760 : 0);
+      var killDelay = canVortex ? 1900 : (cssTear ? 1500 : 820);
 
       window.setTimeout(function () {
         entry.classList.add('is-gone');
@@ -2377,6 +2407,7 @@
           }
 
           var parts = ['v9 · 2026-10-17'];
+          if (isX5) parts.push('已识别 QQ/X5 内核，开场动画走纯 CSS');
           if (reduceMotion) parts.push('⚠ 系统开启了"减少动态效果"，动画已停用');
           else parts.push('动画已启动');
           parts.push(chk.note);
