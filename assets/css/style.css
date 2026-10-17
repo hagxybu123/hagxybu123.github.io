@@ -1996,3 +1996,79 @@ html.js-ready [data-reveal].is-in { opacity: 1; transform: none; animation: none
 @media (max-width: 520px) {
   .build-stamp { left: 8px; bottom: 6px; font-size: .64rem; padding: 3px 9px; }
 }
+
+/* ==================================================================
+   CSS 星层：完全不依赖 canvas 的星星与星环实现。
+   背景：用户设备上 canvas 读出来是纯黑（最亮 0/255），排查未能确定原因
+   （版本正确、动画已启动、CSS 未隐藏画布）。因此做一套 CSS + DOM 的保底实现：
+   只要浏览器能渲染 CSS，星星与星环就一定可见。
+   闪烁由 CSS keyframes 驱动，不需要 JS 每帧参与。
+   ================================================================== */
+.css-stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+/* 只有 canvas 不可用时才显示（由 JS 给 html 加 .use-css-stars） */
+html.use-css-stars .css-stars { opacity: 1; }
+
+.css-stars i {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: #fff;
+  animation: css-twinkle linear infinite;
+  will-change: opacity, transform;
+}
+@keyframes css-twinkle {
+  0%, 100% { opacity: .30; transform: scale(.82); }
+  50%      { opacity: 1;   transform: scale(1.18); }
+}
+/* 亮星带十字星芒 */
+.css-stars i.flare::before,
+.css-stars i.flare::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.css-stars i.flare::before {
+  width: 1100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+}
+.css-stars i.flare::after {
+  width: 1px;
+  height: 1100%;
+  background: linear-gradient(180deg, transparent, currentColor, transparent);
+}
+
+/* 点击星环（DOM 版）：三道扩散圆环 */
+.css-rings {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+.css-ring {
+  position: absolute;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: css-ring-out 1.15s cubic-bezier(.16, .72, .28, 1) forwards;
+}
+@keyframes css-ring-out {
+  0%   { width: 0;     height: 0;     opacity: 1; }
+  70%  { opacity: .85; }
+  100% { width: 520px; height: 520px; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .css-stars i { animation: none; opacity: .78; }
+  .css-ring { animation-duration: .01s; }
+}

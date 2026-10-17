@@ -16,12 +16,13 @@
      用于把"页面到底跑成什么样"直接暴露给用户，而不是靠猜或控制台。
      skyCtx / skyCanvas 由 initSky 填入，供 drawSelfCheck 读取真实像素。 */
   var skyCtx = null, skyCanvas = null;
+  var cssSky = null;   // CSS 星层句柄（降级模式用）
   var skyNotes = [];
   function skyNote(msg) {
     skyNotes.push(msg);
     try {
       var st = document.getElementById('buildStamp');
-      if (st) st.textContent = 'v5 · 2026-10-16 · ⚠ ' + msg;
+      if (st) st.textContent = 'v6 · 2026-10-16 · ⚠ ' + msg;
     } catch (e) {}
   }
 
@@ -1328,6 +1329,98 @@
     }, 45000);
   }
 
+  /* ------------------------------------------------------------------ CSS 星层
+     canvas 失效时的保底方案：用 DOM 元素 + CSS 动画画星星与星环。
+     为什么需要它：用户的设备上 canvas 读出来是纯黑（最亮 0/255），
+     版本、动画开关、CSS 隐藏都已排除，无法进一步定位，
+     因此不再依赖 canvas —— 只要浏览器能渲染 CSS，效果就一定存在。
+     闪烁由 CSS keyframes 驱动，JS 只负责建一次元素。 */
+  function initCssSky() {
+    var layer = $('#cssStars');
+    var ringLayer = $('#cssRings');
+    if (!layer) return;
+
+    // 屏幕小的少放一些，避免手机负担
+    var narrow = window.innerWidth < 760;
+    var count = narrow ? 150 : 300;
+
+    // 用 DocumentFragment 一次性插入，避免逐条触发重排
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < count; i++) {
+      var st = document.createElement('i');
+      var roll = Math.random();
+      var size = roll > 0.93 ? rnd(2.6, 3.8) : (roll > 0.62 ? rnd(1.7, 2.5) : rnd(0.9, 1.6));
+      st.style.left = rnd(-1, 100).toFixed(2) + '%';
+      st.style.top = rnd(-1, 100).toFixed(2) + '%';
+      st.style.width = size.toFixed(1) + 'px';
+      st.style.height = size.toFixed(1) + 'px';
+      st.style.animationDuration = rnd(2.2, 7.4).toFixed(2) + 's';
+      st.style.animationDelay = (-rnd(0, 7)).toFixed(2) + 's';
+      // 色相：金色 / 冰蓝 / 纯白
+      var hue = roll > 0.86 ? '255, 232, 168' : (roll > 0.56 ? '205, 232, 255' : '255, 255, 255');
+      st.style.color = 'rgb(' + hue + ')';
+      st.style.background = 'rgb(' + hue + ')';
+      // 大星星加光晕与星芒
+      if (size > 2.4) {
+        st.className = 'flare';
+        st.style.boxShadow = '0 0 ' + (size * 5).toFixed(1) + 'px ' + (size * 2).toFixed(1) + 'px rgba(' + hue + ', .85)';
+      } else {
+        st.style.boxShadow = '0 0 ' + (size * 3).toFixed(1) + 'px rgba(' + hue + ', .7)';
+      }
+      frag.appendChild(st);
+    }
+    layer.appendChild(frag);
+
+    // DOM 版星环：点击时插入三个扩散圆环，动画结束后自动移除
+    function spawnRings(x, y) {
+      if (!ringLayer) return;
+      var specs = [
+        { w: 5.0, c: '255, 226, 150', delay: 0 },
+        { w: 3.4, c: '190, 224, 255', delay: 60 },
+        { w: 2.2, c: '255, 255, 255', delay: 120 }
+      ];
+      specs.forEach(function (sp, idx) {
+        var el = document.createElement('span');
+        el.className = 'css-ring';
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.border = sp.w.toFixed(1) + 'px solid rgba(' + sp.c + ', .95)';
+        el.style.boxShadow = '0 0 ' + (sp.w * 6).toFixed(0) + 'px rgba(' + sp.c + ', .8)';
+        el.style.animationDelay = sp.delay + 'ms';
+        ringLayer.appendChild(el);
+        window.setTimeout(function () {
+          if (el.parentNode) el.parentNode.removeChild(el);
+        }, 1400 + sp.delay);
+      });
+    }
+
+    // 只在降级模式下接管点击：canvas 正常时由 canvas 画更漂亮的星环
+    window.addEventListener('pointerdown', function (e) {
+      if (document.documentElement.classList.contains('use-css-stars')) {
+        spawnRings(e.clientX, e.clientY);
+      }
+    }, { passive: true });
+
+    // 暴露出去，供自检在判定 canvas 失效后启用
+    cssSky = { layer: layer, spawnRings: spawnRings };
+  }
+
+  /* 启用 CSS 星层：隐藏 canvas，交由 CSS 接管星星与星环 */
+  function enableCssSky(reason) {
+    try {
+      document.documentElement.classList.add('use-css-stars');
+      var cv = $('#sky');
+      if (cv) cv.style.display = 'none';
+      var note = '已切换到 CSS 星层（' + reason + '）';
+      var stamp = $('#buildStamp');
+      if (stamp) stamp.textContent = 'v6 · 2026-10-16 · ' + note;
+      var tag = document.querySelector ? document.querySelector('.build-tag') : null;
+      if (tag) tag.textContent = 'v6 · 2026-10-16 · ' + note;
+      document.title = '天逸 · 星庭 [v6] · ' + note;
+      if (window.console && console.info) console.info('[星庭] ' + note);
+    } catch (e) {}
+  }
+
   /* ------------------------------------------------------------- 开场页 */
   function initEntry() {
     var entry = $('#entry');
@@ -2051,6 +2144,7 @@
     var steps = [
       ['年份', function () { var y = $('#year'); if (y) y.textContent = String(new Date().getFullYear()); }],
       ['星野', initSky],
+      ['CSS 星层（保底）', initCssSky],
       ['滚动与高亮', initScrollUI],
       ['移动菜单', initMenu],
       ['主题切换', initTheme],
@@ -2086,7 +2180,17 @@
       window.setTimeout(function () {
         try {
           var chk = drawSelfCheck();
-          var parts = ['v5 · 2026-10-16'];
+
+          /* canvas 判定为无效时直接切换到 CSS 星层。
+             依据：用户设备上 getImageData 读出最亮 0/255（整块纯黑），
+             而版本、动画开关、CSS 隐藏均已排除，无法进一步定位。
+             既然如此就不再依赖 canvas —— CSS 星层一定画得出来。 */
+          if (!chk.sky) {
+            enableCssSky(chk.note + '，最亮 ' + chk.peak + '/255');
+            return;   // 标记与标题已由 enableCssSky 写好
+          }
+
+          var parts = ['v6 · 2026-10-16'];
           if (reduceMotion) parts.push('⚠ 系统开启了"减少动态效果"，动画已停用');
           else parts.push('动画已启动');
           parts.push(chk.note);
@@ -2094,7 +2198,7 @@
           var line = parts.join(' · ');
           if (stamp) stamp.textContent = line;
           if (tag) tag.textContent = line;
-          document.title = '天逸 · 星庭 [v5]' + (chk.sky ? ' · 星空正常' : ' · ⚠ ' + chk.note);
+          document.title = '天逸 · 星庭 [v6] · ' + chk.note;
         } catch (e) {}
       }, 900);
     } catch (e) {}
