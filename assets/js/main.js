@@ -840,9 +840,96 @@
     });
   }
 
-  /* ------------------------------------------------------------ 留言板 */
-  var STORE_KEY = 'tianyi-guestbook-v1';
+  /* ------------------------------------------------------------ 留言板
+     公用留言板：数据存 Supabase，所有访客都能看到、都能留言。
+     安全说明：这里用的是 Supabase 的 anon public key，公开是官方设计，
+     配合数据库的行级安全（RLS）——匿名只能读和插入，无法改或删任何留言。
+     防刷在数据库端做（同访客 60 秒一条），清浏览器缓存也绕不过。 */
+  var GB = {
+    url: '',            // 例: https://xxxxxxxx.supabase.co
+    key: '',            // anon public key
+    table: 'guestbook',
+    ready: false
+  };
+  var STORE_KEY = 'tianyi-guestbook-v1';   // 仅用于离线兜底缓存
 
+  function gbHeaders(extra) {
+    var h = {
+      apikey: GB.key,
+      Authorization: 'Bearer ' + GB.key,
+      'Content-Type': 'application/json'
+    };
+    if (extra) for (var k in extra) h[k] = extra[k];
+    return h;
+  }
+
+  function gbConfigured() {
+    return !!(GB.url && GB.key && GB.url.indexOf('http') === 0);
+  }
+
+  // 读：所有人可见（匿名可读，无需登录）
+  function gbFetch(limit) {
+    return fetch(GB.url + '/rest/v1/' + GB.table +
+      '?select=id,name,text,created_at&order=created_at.desc&limit=' + (limit || 80), {
+      headers: gbHeaders(),
+      signal: AbortSignal.timeout(12000)
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (rows) {
+      return (rows || []).map(function (r) {
+        return { name: r.name, text: r.text, time: Date.parse(r.created_at) || Date.now() };
+      });
+    });
+  }
+
+  // 每个浏览器一个稳定的随机标识，用于服务端防刷
+  function gbNonce() {
+    var KEY = 'tianyi-gb-nonce';
+    var v = null;
+    try { v = localStorage.getItem(KEY); } catch (e) {}
+    if (!v || v.length < 12) {
+      v = '';
+      for (var i = 0; i < 4; i++) v += Math.random().toString(36).slice(2, 10);
+      try { localStorage.setItem(KEY, v); } catch (e) {}
+    }
+    // 每次提交都换一个：服务端看的是"最近 60 秒内有没有别的提交"
+    return v + '-' + Date.now().toString(36);
+  }
+
+  // 写：先问服务端能不能发（60 秒限流），通过再插入
+  function gbPost(name, text) {
+    return fetch(GB.url + '/rest/v1/rpc/check_guestbook_nonce', {
+      method: 'POST',
+      headers: gbHeaders(),
+      body: JSON.stringify({ p_nonce: gbNonce() }),
+      signal: AbortSignal.timeout(12000)
+    }).then(function (r) {
+      if (!r.ok) throw new Error('限流检查失败 HTTP ' + r.status);
+      return r.json();
+    }).then(function (allowed) {
+      if (allowed !== true) {
+        var e = new Error('rate');
+        e.code = 'rate';
+        throw e;
+      }
+      return fetch(GB.url + '/rest/v1/' + GB.table, {
+        method: 'POST',
+        headers: gbHeaders({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ name: name, text: text }),
+        signal: AbortSignal.timeout(12000)
+      });
+    }).then(function (r) {
+      if (!r.ok) {
+        var e = new Error('HTTP ' + r.status);
+        e.code = r.status === 409 ? 'dup' : 'fail';
+        throw e;
+      }
+      return true;
+    });
+  }
+
+  /* 离线兜底：后端不可用/未配置时，退回本地存储，功能不白屏 */
   function readMessages() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
@@ -861,14 +948,24 @@
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
 
-  function renderMessages() {
+  function renderMessages(data, placeholder) {
     var list = $('#guestList');
     var empty = $('#emptyHint');
     if (!list) return;
-    var data = readMessages();
+    var rows = data || [];
     list.innerHTML = '';
 
-    data.forEach(function (m) {
+    if (placeholder) {
+      // 加载中 / 加载失败：给一行灰字，而不是空白，避免让人以为"没有留言"
+      var ph = document.createElement('li');
+      ph.className = 'g-placeholder';
+      ph.textContent = placeholder;
+      list.appendChild(ph);
+      if (empty) empty.style.display = 'none';
+      return;
+    }
+
+    rows.forEach(function (m) {
       var li = document.createElement('li');
       var head = document.createElement('div');
       head.className = 'g-head';
@@ -890,7 +987,25 @@
       list.appendChild(li);
     });
 
-    if (empty) empty.style.display = data.length ? 'none' : 'block';
+    if (empty) empty.style.display = rows.length ? 'none' : 'block';
+  }
+
+  // 拉取并渲染；后端没配好或挂了就退回本地缓存，页面不会白掉
+  function gbRefresh(showLoading) {
+    if (showLoading) renderMessages([], '正在取星简…');
+    if (!gbConfigured()) {
+      renderMessages(readMessages());
+      return Promise.resolve({ offline: true });
+    }
+    return gbFetch().then(function (rows) {
+      writeMessages(rows);                    // 成功时刷新本地缓存
+      renderMessages(rows);
+      return { online: true, count: rows.length };
+    }).catch(function () {
+      var cached = readMessages();
+      renderMessages(cached, cached.length ? '' : '星简暂时读不到（网络或服务未就绪）');
+      return { error: true };
+    });
   }
 
   function initGuestbook() {
@@ -920,28 +1035,57 @@
       if (!name) { say('还没告诉我怎么称呼你呢 ✦', true); nameEl.focus(); return; }
       if (text.length < 4) { say('至少写 4 个字吧，我认真看的 ✦', true); msgEl.focus(); return; }
 
-      var list = readMessages();
-      list.unshift({ name: name.slice(0, 20), text: text.slice(0, 300), time: Date.now() });
-      writeMessages(list);
-      renderMessages();
+      var submitBtn = form.querySelector('button[type="submit"]');
+      function lock(on) {
+        if (submitBtn) submitBtn.disabled = !!on;
+        form.classList.toggle('is-sending', !!on);
+      }
 
-      form.reset();
-      if (counter) counter.textContent = '0';
-      say('星简已封存，谢谢你来到我的星庭 ✦');
+      // 未配置后端：写本地，并如实说明
+      if (!gbConfigured()) {
+        var list = readMessages();
+        list.unshift({ name: name.slice(0, 20), text: text.slice(0, 300), time: Date.now() });
+        writeMessages(list);
+        renderMessages(list);
+        form.reset();
+        if (counter) counter.textContent = '0';
+        say('已存在本机（公用留言板尚未接通）');
+        return;
+      }
+
+      lock(true);
+      say('正在送往星庭…');
+      gbPost(name.slice(0, 20), text.slice(0, 300)).then(function () {
+        form.reset();
+        if (counter) counter.textContent = '0';
+        say('星简已送达，所有人都能看到了 ✦');
+        return gbRefresh();
+      }).catch(function (err) {
+        var code = err && err.code;
+        if (code === 'rate') say('发得太快了，等一分钟再来 ✦', true);
+        else if (code === 'dup') say('这条刚刚已经发过了 ✦', true);
+        else say('没能送出去，检查下网络再试一次 ✦', true);
+        // 失败时也刷新一次，让用户看到服务端真实状态
+        return gbRefresh();
+      }).then(function () {
+        lock(false);
+      });
     });
 
     if (clearBtn) {
       clearBtn.addEventListener('click', function () {
-        if (!readMessages().length) { say('这里本来就没有留言。'); return; }
-        if (window.confirm('确定清空保存在这个浏览器里的留言吗？')) {
-          writeMessages([]);
-          renderMessages();
-          say('已清空。');
-        }
+        // 公用留言不能由访客清空（数据库也不给删的权限），这里只清本地缓存
+        try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+        say('已清掉本机缓存。星庭上的留言由站主保管，谁也删不掉 ✦');
+        gbRefresh();
       });
     }
 
-    renderMessages();
+    gbRefresh(true);
+    // 每 45 秒自动同步一次，别人新留的言能自己出现
+    window.setInterval(function () {
+      if (!document.hidden) gbRefresh();
+    }, 45000);
   }
 
   /* ------------------------------------------------------------- 开场页 */

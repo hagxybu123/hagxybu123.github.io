@@ -1437,6 +1437,33 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
 .guest-list .g-name { font-weight: 600; color: var(--ice-200); font-size: .92rem; }
 .guest-list .g-time { font-size: .72rem; color: var(--text-dim); }
 .guest-list .g-body { margin: 0; font-size: .9rem; color: var(--text-soft); white-space: pre-wrap; word-break: break-word; }
+
+/* 加载中 / 读取失败的占位行：给个动静，别让人以为"没有留言" */
+.guest-list .g-placeholder {
+  padding: 16px 18px;
+  border-style: dashed;
+  color: var(--text-dim);
+  font-size: .84rem;
+  text-align: center;
+  background: none;
+  animation: none;
+}
+.guest-list .g-placeholder::after {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--ice-200);
+  animation: ai-dot 1s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+/* 提交中：按钮转起来，防止重复点击 */
+.guest-form.is-sending button[type="submit"] { opacity: .55; cursor: progress; }
+.guest-form.is-sending button[type="submit"] svg { animation: spin 1s linear infinite; }
+
 .empty-hint { margin: 16px 0 0; font-size: .86rem; color: var(--text-dim); }
 
 /* ------------------------------ 角色专区 ------------------------------ */
