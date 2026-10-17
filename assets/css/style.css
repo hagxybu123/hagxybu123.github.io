@@ -561,19 +561,20 @@ html[data-theme="light"] .aurora { opacity: .5; }
   filter: saturate(1.08) contrast(1.04);
 }
 /* 首屏不再铺自己的图片：全页 NASA 实拍星空就是背景，
-   这里只叠一层渐晕，保证左侧文案可读、下方与页面自然衔接。 */
+   这里只叠一层很轻的渐晕（梦幻方向：尽量让照片透出来），
+   左侧略压暗以保证标题可读，下方与页面自然衔接。 */
 .hero-media { display: none; }
 .hero-veil {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(4, 8, 26, .58) 0%, rgba(4, 8, 26, .30) 30%, rgba(4, 8, 26, .72) 76%, var(--navy-900) 100%),
-    radial-gradient(115% 85% at 22% 45%, rgba(4, 8, 26, .78) 0%, rgba(4, 8, 26, .34) 46%, transparent 72%);
+    linear-gradient(180deg, rgba(4, 8, 26, .34) 0%, rgba(4, 8, 26, .10) 32%, rgba(4, 8, 26, .46) 78%, var(--navy-900) 100%),
+    radial-gradient(120% 88% at 20% 46%, rgba(4, 8, 26, .58) 0%, rgba(4, 8, 26, .20) 48%, transparent 74%);
 }
 html[data-theme="light"] .hero-veil {
   background:
-    linear-gradient(180deg, rgba(244, 247, 255, .70) 0%, rgba(244, 247, 255, .50) 30%, rgba(244, 247, 255, .84) 76%, var(--navy-900) 100%),
-    radial-gradient(115% 85% at 22% 45%, rgba(244, 247, 255, .82) 0%, rgba(244, 247, 255, .40) 46%, transparent 72%);
+    linear-gradient(180deg, rgba(244, 247, 255, .58) 0%, rgba(244, 247, 255, .34) 32%, rgba(244, 247, 255, .72) 78%, var(--navy-900) 100%),
+    radial-gradient(120% 88% at 20% 46%, rgba(244, 247, 255, .66) 0%, rgba(244, 247, 255, .26) 48%, transparent 74%);
 }
 
 .hero-inner {
@@ -865,6 +866,24 @@ html[data-theme="light"] .hero-card-body { background: linear-gradient(180deg, t
   position: relative;
   z-index: 2;
   padding: clamp(70px, 11vh, 130px) 0;
+}
+/* 内容区极淡背板：背景变亮后保证长文可读，同时不破坏梦幻通透感 */
+.section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(5, 10, 30, .32) 0%,
+    rgba(5, 10, 30, .20) 50%,
+    rgba(5, 10, 30, .32) 100%);
+}
+html[data-theme="light"] .section::before {
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, .56) 0%,
+    rgba(255, 255, 255, .44) 50%,
+    rgba(255, 255, 255, .56) 100%);
 }
 .section-head { max-width: 760px; margin-bottom: clamp(34px, 5vw, 60px); }
 .kicker {
