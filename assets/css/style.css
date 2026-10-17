@@ -219,7 +219,6 @@ html {
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--navy-900);
   color: var(--text);
   font-family: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", "Noto Sans SC",
                system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -228,10 +227,17 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  transition: background .5s var(--ease), color .5s var(--ease);
+  /* 全页背景：NASA 实拍星空（公有领域），固定不随滚动 */
+  background-color: var(--navy-900);
+  background-image: url("../img/sky-bg.jpg");
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  transition: color .5s var(--ease);
 }
 
-/* 静态星云色 + 星点兜底：万一 JS 没跑起来，背景依然是一片明亮的星空 */
+/* 色调兜底层：图片没加载出来时仍然是星空氛围；Canvas 接管后淡出 */
 body::before {
   content: "";
   position: fixed;
@@ -240,12 +246,12 @@ body::before {
   pointer-events: none;
   opacity: 1;
   background-image:
-    /* 底层：大块星云色，让背景不再是死黑 */
-    radial-gradient(52% 42% at 16% 20%, rgba(96, 140, 255, .40), transparent 68%),
-    radial-gradient(46% 38% at 84% 16%, rgba(168, 108, 245, .36), transparent 68%),
-    radial-gradient(56% 46% at 56% 78%, rgba(56, 176, 235, .30), transparent 70%),
-    radial-gradient(34% 26% at 40% 8%,  rgba(242, 205, 140, .26), transparent 70%),
-    /* 上层：密度更高的星点，纯白高亮 */
+    /* 底层：大块星云色 */
+    radial-gradient(52% 42% at 16% 20%, rgba(96, 140, 255, .34), transparent 68%),
+    radial-gradient(46% 38% at 84% 16%, rgba(168, 108, 245, .30), transparent 68%),
+    radial-gradient(56% 46% at 56% 78%, rgba(56, 176, 235, .26), transparent 70%),
+    radial-gradient(34% 26% at 40% 8%,  rgba(242, 205, 140, .22), transparent 70%),
+    /* 上层：纯白高亮星点 */
     radial-gradient(2.6px 2.6px at 12% 18%, rgba(255,255,255,1), transparent 100%),
     radial-gradient(2.1px 2.1px at 74% 8%,  rgba(220,238,255,1), transparent 100%),
     radial-gradient(3.0px 3.0px at 46% 34%, rgba(255,255,255,1), transparent 100%),
@@ -554,17 +560,20 @@ html[data-theme="light"] .aurora { opacity: .5; }
   transform: scale(1.06);
   filter: saturate(1.08) contrast(1.04);
 }
+/* 首屏不再铺自己的图片：全页 NASA 实拍星空就是背景，
+   这里只叠一层渐晕，保证左侧文案可读、下方与页面自然衔接。 */
+.hero-media { display: none; }
 .hero-veil {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(5, 8, 26, .62) 0%, rgba(5, 8, 26, .46) 32%, rgba(5, 8, 26, .78) 74%, var(--navy-900) 100%),
-    radial-gradient(120% 90% at 78% 18%, rgba(60, 100, 200, .34), transparent 62%);
+    linear-gradient(180deg, rgba(4, 8, 26, .58) 0%, rgba(4, 8, 26, .30) 30%, rgba(4, 8, 26, .72) 76%, var(--navy-900) 100%),
+    radial-gradient(115% 85% at 22% 45%, rgba(4, 8, 26, .78) 0%, rgba(4, 8, 26, .34) 46%, transparent 72%);
 }
 html[data-theme="light"] .hero-veil {
   background:
-    linear-gradient(180deg, rgba(244, 247, 255, .74) 0%, rgba(244, 247, 255, .58) 34%, rgba(244, 247, 255, .88) 74%, var(--navy-900) 100%),
-    radial-gradient(120% 90% at 78% 18%, rgba(120, 160, 240, .32), transparent 62%);
+    linear-gradient(180deg, rgba(244, 247, 255, .70) 0%, rgba(244, 247, 255, .50) 30%, rgba(244, 247, 255, .84) 76%, var(--navy-900) 100%),
+    radial-gradient(115% 85% at 22% 45%, rgba(244, 247, 255, .82) 0%, rgba(244, 247, 255, .40) 46%, transparent 72%);
 }
 
 .hero-inner {
