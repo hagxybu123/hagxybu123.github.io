@@ -46,72 +46,80 @@
 
     function build() {
       stars = [];
-      var count = Math.round(Math.min(240, Math.max(90, (w * h) / 9500)));
+      var count = Math.round(Math.min(260, Math.max(110, (w * h) / 8200)));
       for (var i = 0; i < count; i++) {
         var roll = Math.random();
+        // 金色星点占比提到约 1/5，让"星光金"真正看得见
+        var hue = roll > 0.80 ? 'gold' : (roll > 0.46 ? 'ice' : 'white');
         stars.push({
           x: Math.random() * w,
           y: Math.random() * h * 1.2,
-          r: rnd(0.4, 2.1),
-          a: rnd(0.3, 0.92),
-          tw: rnd(0.010, 0.038),
+          r: hue === 'gold' ? rnd(0.9, 3.0) : rnd(0.7, 2.5),
+          a: hue === 'gold' ? rnd(0.60, 1) : rnd(0.45, 1),
+          tw: rnd(0.012, 0.042),
           dir: Math.random() > 0.5 ? 1 : -1,
           depth: rnd(0.15, 0.9),
-          hue: roll > 0.90 ? 'gold' : (roll > 0.55 ? 'ice' : 'white'),
-          flare: Math.random() > 0.94
+          hue: hue,
+          flare: hue === 'gold' ? Math.random() > 0.5 : Math.random() > 0.86
         });
       }
 
       dust = [];
-      var dCount = Math.round(Math.min(150, Math.max(50, (w * h) / 15000)));
+      var dCount = Math.round(Math.min(170, Math.max(60, (w * h) / 12000)));
       for (var d = 0; d < dCount; d++) {
         dust.push({
           x: Math.random() * w,
           y: Math.random() * h,
-          r: rnd(1.4, 3.4),
-          vx: rnd(-0.14, 0.14),
-          vy: rnd(-0.28, -0.05),
-          a: rnd(0.10, 0.36),
-          hue: Math.random() > 0.6 ? 'ice' : 'white',
+          r: rnd(1.6, 4.2),
+          vx: rnd(-0.16, 0.16),
+          vy: rnd(-0.32, -0.06),
+          a: rnd(0.20, 0.55),
+          hue: Math.random() > 0.4 ? 'gold' : 'ice',
           ph: Math.random() * 6.28
         });
       }
 
       clouds = [
-        { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.42, vx: 0.018, vy: 0.009, c: [96, 140, 255], a: 0.100 },
-        { x: w * 0.82, y: h * 0.18, r: Math.max(w, h) * 0.38, vx: -0.013, vy: 0.011, c: [170, 120, 235], a: 0.085 },
-        { x: w * 0.55, y: h * 0.72, r: Math.max(w, h) * 0.46, vx: 0.009, vy: -0.012, c: [70, 170, 220], a: 0.070 }
+        { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.44, vx: 0.018, vy: 0.009, c: [104, 150, 255], a: 0.200 },
+        { x: w * 0.82, y: h * 0.18, r: Math.max(w, h) * 0.40, vx: -0.013, vy: 0.011, c: [176, 126, 240], a: 0.175 },
+        { x: w * 0.55, y: h * 0.72, r: Math.max(w, h) * 0.48, vx: 0.009, vy: -0.012, c: [72, 178, 226], a: 0.150 }
       ];
     }
 
     function palette(hue) {
-      if (hue === 'gold') return '242, 215, 155';
-      if (hue === 'ice') return '180, 215, 255';
+      if (hue === 'gold') return '255, 224, 150';
+      if (hue === 'ice') return '186, 220, 255';
       return '255, 255, 255';
     }
 
     function spawnComet() {
-      if (comets.length >= 4) return;
+      if (comets.length >= 5) return;
       var fromLeft = Math.random() > 0.35;
       comets.push({
         x: fromLeft ? rnd(-w * 0.2, w * 0.55) : rnd(w * 0.5, w * 1.2),
         y: rnd(-h * 0.05, h * 0.55),
         ang: fromLeft ? rnd(0.28, 0.62) : rnd(Math.PI - 0.62, Math.PI - 0.28),
-        speed: rnd(6.5, 13),
-        len: rnd(110, 260),
+        speed: rnd(7, 14),
+        len: rnd(140, 320),
         life: 1,
-        decay: rnd(0.0045, 0.0095),
-        width: rnd(1.1, 2.5),
-        hue: Math.random() > 0.85 ? 'gold' : 'ice'
+        decay: rnd(0.004, 0.0085),
+        width: rnd(1.4, 3.2),
+        // 金色彗星占比提到约 40%，"金色星光"成为主视觉
+        hue: Math.random() > 0.6 ? 'gold' : 'ice'
       });
     }
 
     function addSpark(x, y) {
-      var n = 18;
+      var n = 26;
       for (var i = 0; i < n; i++) {
         var ang = (Math.PI * 2 * i) / n + rnd(-0.2, 0.2);
-        var sp = rnd(1.2, 5.2);
-        sparks.push({ x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, decay: rnd(0.015, 0.032) });
+        var sp = rnd(1.5, 6.4);
+        sparks.push({
+          x: x, y: y,
+          vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+          life: 1, decay: rnd(0.012, 0.028),
+          hue: Math.random() > 0.35 ? 'gold' : 'ice'
+        });
       }
     }
 
@@ -165,8 +173,8 @@
       for (var s = 0; s < stars.length; s++) {
         var st = stars[s];
         st.a += st.tw * st.dir * dt;
-        if (st.a >= 0.97) { st.a = 0.97; st.dir = -1; }
-        if (st.a <= 0.18) { st.a = 0.18; st.dir = 1; }
+        if (st.a >= 1) { st.a = 1; st.dir = -1; }
+        if (st.a <= 0.30) { st.a = 0.30; st.dir = 1; }
 
         var y = st.y - scrollY * st.depth * 0.08;
         var span = h * 1.25;
@@ -175,24 +183,44 @@
 
         var boost = 0;
         var dxm = st.x - mx, dym = y - my;
-        if (dxm * dxm + dym * dym < 19000) boost = 0.45;
+        if (dxm * dxm + dym * dym < 19000) boost = 0.5;
 
         var alpha = Math.min(1, st.a + boost);
         var col = palette(st.hue);
+        var radius = st.r * (1 + boost);
 
         if (st.flare) {
+          // 十字星芒：金色亮星带四向光针，肉眼一眼能认出来
           ctx.globalCompositeOperation = 'lighter';
           ctx.beginPath();
-          ctx.fillStyle = 'rgba(' + col + ', ' + (alpha * 0.10).toFixed(3) + ')';
-          ctx.arc(st.x, y, st.r * 7.5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(' + col + ', ' + (alpha * 0.26).toFixed(3) + ')';
+          ctx.arc(st.x, y, st.r * 9, 0, Math.PI * 2);
           ctx.fill();
+
+          var ray = st.r * (st.hue === 'gold' ? 11 : 7);
+          ctx.strokeStyle = 'rgba(' + col + ', ' + (alpha * 0.55).toFixed(3) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(st.x - ray, y); ctx.lineTo(st.x + ray, y);
+          ctx.moveTo(st.x, y - ray); ctx.lineTo(st.x, y + ray);
+          ctx.stroke();
           ctx.globalCompositeOperation = 'source-over';
         }
 
         ctx.beginPath();
         ctx.fillStyle = 'rgba(' + col + ', ' + alpha.toFixed(3) + ')';
-        ctx.arc(st.x, y, st.r * (1 + boost), 0, Math.PI * 2);
+        ctx.arc(st.x, y, radius, 0, Math.PI * 2);
         ctx.fill();
+
+        // 再叠一层柔光，让亮星有"发光"的实感
+        if (alpha > 0.72) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.beginPath();
+          ctx.fillStyle = 'rgba(' + col + ', ' + (alpha * 0.20).toFixed(3) + ')';
+          ctx.arc(st.x, y, radius * 3.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+        }
       }
 
       // 彗星：常驻划过
@@ -201,10 +229,11 @@
         var cm = comets[m];
         var dx = Math.cos(cm.ang), dy = Math.sin(cm.ang);
         var tx = cm.x - dx * cm.len, ty = cm.y - dy * cm.len;
-        var grad = ctx.createLinearGradient(cm.x, cm.y, tx, ty);
         var col2 = palette(cm.hue);
-        grad.addColorStop(0, 'rgba(255, 255, 255, ' + (0.95 * cm.life).toFixed(3) + ')');
-        grad.addColorStop(0.18, 'rgba(' + col2 + ', ' + (0.70 * cm.life).toFixed(3) + ')');
+        var grad = ctx.createLinearGradient(cm.x, cm.y, tx, ty);
+        grad.addColorStop(0, 'rgba(255, 255, 255, ' + Math.min(1, 1.15 * cm.life).toFixed(3) + ')');
+        grad.addColorStop(0.16, 'rgba(' + col2 + ', ' + Math.min(1, 1.05 * cm.life).toFixed(3) + ')');
+        grad.addColorStop(0.55, 'rgba(' + col2 + ', ' + (0.42 * cm.life).toFixed(3) + ')');
         grad.addColorStop(1, 'rgba(' + col2 + ', 0)');
         ctx.strokeStyle = grad;
         ctx.lineWidth = cm.width;
@@ -214,13 +243,14 @@
         ctx.lineTo(tx, ty);
         ctx.stroke();
 
-        // 头部光晕
-        var hg = ctx.createRadialGradient(cm.x, cm.y, 0, cm.x, cm.y, 16);
-        hg.addColorStop(0, 'rgba(255, 255, 255, ' + (0.9 * cm.life).toFixed(3) + ')');
+        // 头部光晕（外圈放大，形成明显的发光头部）
+        var hg = ctx.createRadialGradient(cm.x, cm.y, 0, cm.x, cm.y, 26);
+        hg.addColorStop(0, 'rgba(255, 255, 255, ' + Math.min(1, 1.1 * cm.life).toFixed(3) + ')');
+        hg.addColorStop(0.35, 'rgba(' + col2 + ', ' + (0.62 * cm.life).toFixed(3) + ')');
         hg.addColorStop(1, 'rgba(' + col2 + ', 0)');
         ctx.fillStyle = hg;
         ctx.beginPath();
-        ctx.arc(cm.x, cm.y, 16, 0, Math.PI * 2);
+        ctx.arc(cm.x, cm.y, 26, 0, Math.PI * 2);
         ctx.fill();
 
         cm.x += dx * cm.speed * dt;
@@ -238,19 +268,25 @@
         sp.vy *= 0.975;
         sp.life -= sp.decay * dt;
         if (sp.life <= 0) { sparks.splice(k, 1); continue; }
+        var scol = sp.hue === 'gold' ? '255, 226, 150' : '200, 230, 255';
+        // 先画一圈光晕再画芯，金色才会"炸"出来
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(255, 246, 214, ' + sp.life.toFixed(3) + ')';
-        ctx.arc(sp.x, sp.y, 1.7 * sp.life, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + scol + ', ' + (sp.life * 0.25).toFixed(3) + ')';
+        ctx.arc(sp.x, sp.y, 5.5 * sp.life, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(' + scol + ', ' + Math.min(1, sp.life * 1.2).toFixed(3) + ')';
+        ctx.arc(sp.x, sp.y, 1.9 * sp.life, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalCompositeOperation = 'source-over';
 
-      // 彗星节奏：平均 2.5~5 秒一颗，偶尔双发
+      // 彗星节奏：平均 1.6~3.2 秒一颗，约七成概率同时来两颗
       acc += rawDt;
       if (acc > cometAt) {
         spawnComet();
-        if (Math.random() > 0.72) spawnComet();
-        cometAt = rnd(2500, 5000);
+        if (Math.random() > 0.3) spawnComet();
+        cometAt = rnd(1600, 3200);
         acc = 0;
       }
 
