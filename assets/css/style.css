@@ -2252,3 +2252,30 @@ html:not(.use-css-stars) .css-stars * {
   .entry.is-css-tear::after { animation: none; opacity: 0; }
   .entry.is-css-tear .entry-inner { animation: none; opacity: 0; }
 }
+
+/* ==================================================================
+   静态星空层（3 层平铺贴图）
+   为什么换成这个：原来是 65 个 <i> 元素各自一条闪烁动画，
+   在 QQ 的 X5 内核上会持续闪烁（用户实测"主页一直闪"），
+   即使已经把 will-change、box-shadow、元素数量都削减过仍然闪。
+   现在改为 3 层 background-image 平铺贴图，每层一条 opacity 动画 ——
+   动画数从 65 降到 3，且每层贴图里有几十颗星，观感密度不减反增。
+   贴图由 JS 一次性生成（starTile），这里只负责播放。
+   ================================================================== */
+.star-layer {
+  position: absolute;
+  inset: -40px;                 /* 外扩，避免平铺边缘出现接缝 */
+  background-repeat: repeat;
+  /* 只动 opacity：合成线程即可完成，不重排不重绘，
+     这是所有 CSS 动画里最便宜的一类。 */
+  animation: star-layer-twinkle linear infinite;
+}
+
+@keyframes star-layer-twinkle {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star-layer { animation: none; opacity: .8 !important; }
+}

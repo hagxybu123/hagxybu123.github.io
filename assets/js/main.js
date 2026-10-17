@@ -49,6 +49,70 @@
      绘制函数由 initSky 通过 skyForceDraw 暴露（见该函数的赋值处）。 */
   var skyForceDraw = null;
 
+  /* ---------------------------------------------------------------- 画布探针
+     在地自己新建的一块小画布上画已知图形，再读回像素。
+     目的：区分两种完全不同的故障 ——
+       · 探针失败  -> 该浏览器/内核根本不能正常绘制 canvas
+       · 探针成功  -> canvas 是好的，问题在星空的绘制代码路径上
+     这一步能把"猜"变成"读"。 */
+  function canvasProbe() {
+    var out = { ok: false, note: '' };
+    try {
+      var c = document.createElement('canvas');
+      c.width = 32;
+      c.height = 32;
+      var g = c.getContext('2d');
+      if (!g) { out.note = '无法创建 2D 上下文'; return out; }
+
+      // ① 纯色方块
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, 16, 16);
+      var solid = g.getImageData(0, 0, 1, 1).data;
+      var solidLum = Math.round((solid[0] * 299 + solid[1] * 587 + solid[2] * 114) / 1000);
+
+      // ② 实心圆（星空用的就是 arc + fill）
+      g.clearRect(0, 0, 32, 32);
+      g.fillStyle = 'rgba(255,255,255,1)';
+      g.beginPath();
+      g.arc(16, 16, 6, 0, Math.PI * 2);
+      g.fill();
+      var arcD = g.getImageData(16, 16, 1, 1).data;
+      var arcLum = Math.round((arcD[0] * 299 + arcD[1] * 587 + arcD[2] * 114) / 1000);
+
+      // ③ 径向渐变（精灵烘焙用的就是它）
+      g.clearRect(0, 0, 32, 32);
+      var rg = g.createRadialGradient(16, 16, 0, 16, 16, 14);
+      rg.addColorStop(0, 'rgba(255,255,255,1)');
+      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = rg;
+      g.beginPath();
+      g.arc(16, 16, 14, 0, Math.PI * 2);
+      g.fill();
+      var gradD = g.getImageData(16, 16, 1, 1).data;
+      var gradLum = Math.round((gradD[0] * 299 + gradD[1] * 587 + gradD[2] * 114) / 1000);
+
+      // ④ 把上面那块画布贴到另一块（验证 drawImage 链路）
+      var c2 = document.createElement('canvas');
+      c2.width = 32;
+      c2.height = 32;
+      var g2 = c2.getContext('2d');
+      g2.drawImage(c, 0, 0);
+      var imgD = g2.getImageData(16, 16, 1, 1).data;
+      var imgLum = Math.round((imgD[0] * 299 + imgD[1] * 587 + imgD[2] * 114) / 1000);
+
+      out.solid = solidLum;
+      out.arc = arcLum;
+      out.grad = gradLum;
+      out.drawImage = imgLum;
+      out.ok = solidLum > 0;   // 纯色填充是底线能力
+      out.note = '探针 方块' + solidLum + ' 圆' + arcLum + ' 渐变' + gradLum + ' 贴图' + imgLum;
+      return out;
+    } catch (e) {
+      out.note = '探针异常 ' + (e && e.name ? e.name : '?');
+      return out;
+    }
+  }
+
   function forceSkyFrame() {
     if (typeof skyForceDraw === 'function') {
       try { skyForceDraw(); return true; } catch (e) { return false; }
@@ -62,13 +126,18 @@
      改为看**最亮的那批像素有多亮**：有星星 -> 顶端会明显高亮；
      全黑画布 -> 最亮的也只有个位数。 */
   function drawSelfCheck() {
-    var res = { peak: 0, sky: false, note: '' };
+    /* 先跑一次独立画布探针。它决定"画布几乎是黑的"该被解读成什么：
+         · 探针也失败 -> 该浏览器/内核不能正常绘制 canvas（不是星空代码的问题）
+         · 探针正常   -> canvas 可用，问题在星空的绘制路径上
+       两种情况的修复方向完全不同，必须先分清。 */
+    var probe = canvasProbe();
+    var res = { peak: 0, sky: false, note: '', probe: probe };
     try {
       if (!skyCtx || !skyCanvas) { res.note = '画布未初始化'; return res; }
       var w = skyCanvas.width, h = skyCanvas.height;
       if (!w || !h) { res.note = '画布尺寸为 0'; return res; }
       // 关键：先确保画布上真的有一帧内容，否则会把"暂停中"误判成"坏掉"
-      forceSkyFrame();
+      var drew = forceSkyFrame();
       var data = skyCtx.getImageData(0, 0, w, h).data;
       var hist = new Array(256).fill(0);
       var total = 0;
@@ -85,9 +154,15 @@
       for (var v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= need) { cut = v; break; } }
       res.peak = cut;
       res.sky = cut >= 90;
-      res.note = res.sky
-        ? '星空已绘制（最亮像素 ' + cut + '/255）'
-        : '画布几乎是黑的（最亮仅 ' + cut + '/255）';
+      if (res.sky) {
+        res.note = '星空已绘制（最亮像素 ' + cut + '/255）';
+      } else if (!probe.ok) {
+        res.note = '本机无法绘制 canvas（' + probe.note + '）';
+      } else if (!drew) {
+        res.note = '强制重绘未执行（最亮仅 ' + cut + '/255）';
+      } else {
+        res.note = '绘制后仍为空白（最亮仅 ' + cut + '/255）';
+      }
     } catch (e) {
       res.note = '无法读取画布像素：' + (e && e.name ? e.name : '未知');
     }
@@ -1405,54 +1480,107 @@
      版本、动画开关、CSS 隐藏都已排除，无法进一步定位，
      因此不再依赖 canvas —— 只要浏览器能渲染 CSS，效果就一定存在。
      闪烁由 CSS keyframes 驱动，JS 只负责建一次元素。 */
+  /* 生成一层静态星空贴图，返回 data URL。
+     思路：把几十颗星画进一张小画布（只画一次），交给 CSS 作为
+     background-image 平铺。这样浏览器只需维护 3 个元素、3 条动画，
+     而不是几十个元素各自一条 —— 这正是主页闪烁的来源。
+     注意：这里用 canvas 只是"一次性生成贴图"，即使该内核的动态 canvas
+     绘制有问题，静态贴图通常也能正常生成；万一失败会退回逐元素方案。 */
+  function starTile(w, h, n, palettes, maxR) {
+    try {
+      var c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      var g = c.getContext('2d');
+      if (!g) return null;
+      for (var i = 0; i < n; i++) {
+        var col = palettes[(Math.random() * palettes.length) | 0];
+        var r = rnd(0.5, maxR);
+        var x = rnd(0, w);
+        var y = rnd(0, h);
+        // 光晕：小范围径向渐变，仅在生成贴图时创建一次
+        var rg = g.createRadialGradient(x, y, 0, x, y, r * 3.2);
+        rg.addColorStop(0, 'rgba(' + col + ', ' + rnd(0.55, 0.95).toFixed(2) + ')');
+        rg.addColorStop(1, 'rgba(' + col + ', 0)');
+        g.fillStyle = rg;
+        g.beginPath();
+        g.arc(x, y, r * 3.2, 0, Math.PI * 2);
+        g.fill();
+        // 白芯
+        g.fillStyle = 'rgba(255,255,255,' + rnd(0.6, 1).toFixed(2) + ')';
+        g.beginPath();
+        g.arc(x, y, r * 0.6, 0, Math.PI * 2);
+        g.fill();
+      }
+      var url = c.toDataURL('image/png');
+      // 极小的 data URL 说明是空图，视为失败
+      return url && url.length > 400 ? url : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function initCssSky() {
     var layer = $('#cssStars');
     var ringLayer = $('#cssRings');
     if (!layer) return;
 
-    /* 元素数量是 CSS 动画成本的主因：每个元素都有自己的动画与样式计算。
-       实测 300 个元素在手机上明显卡顿，因此大幅削减 ——
-       观感上几乎察觉不到（真实星空的亮点本来也稀疏）。 */
+    /* 把星空做成 3 层"平铺贴图"，每层各一条动画。
+       为什么换实现：原来是 65 个 <i> 元素各自一条闪烁动画，
+       在 QQ 的 X5 内核上会持续闪烁（用户实测"主页一直闪"）。
+       现在只有 3 个元素、3 条动画，动画数从 65 降到 3 —— 观感密度不减反增
+       （每层贴图里有几十颗星），但浏览器的负担下降一个数量级。 */
     var narrow = window.innerWidth < 760;
-    var count = narrow ? 65 : 140;
+    var tileSize = narrow ? 320 : 420;
+    var LAYERS = [
+      { n: narrow ? 46 : 78, maxR: 1.5, cols: ['255, 255, 255', '205, 232, 255', '255, 232, 168'],
+        dur: '5.2s', op: 0.85 },
+      { n: narrow ? 30 : 54, maxR: 1.1, cols: ['255, 255, 255', '190, 220, 255'],
+        dur: '7.6s', op: 0.62 },
+      { n: narrow ? 16 : 30, maxR: 2.2, cols: ['255, 232, 168', '255, 255, 255', '210, 235, 255'],
+        dur: '3.8s', op: 1 }
+    ];
 
-    /* 用 DocumentFragment 一次性插入，避免逐条触发重排。
-       注意：极老的浏览器（含部分定制内核）可能没有 createDocumentFragment，
-       此时必须退回到逐条 append，否则整个星层会静默失败 —— 一片漆黑。 */
-    var frag = null;
-    try {
-      if (typeof document.createDocumentFragment === 'function') frag = document.createDocumentFragment();
-    } catch (e) { frag = null; }
-    var container = frag || layer;
-    for (var i = 0; i < count; i++) {
-      var st = document.createElement('i');
-      var roll = Math.random();
-      var size = roll > 0.93 ? rnd(2.6, 3.8) : (roll > 0.62 ? rnd(1.7, 2.5) : rnd(0.9, 1.6));
-      st.style.left = rnd(-1, 100).toFixed(2) + '%';
-      st.style.top = rnd(-1, 100).toFixed(2) + '%';
-      st.style.width = size.toFixed(1) + 'px';
-      st.style.height = size.toFixed(1) + 'px';
-      st.style.animationDuration = rnd(2.2, 7.4).toFixed(2) + 's';
-      st.style.animationDelay = (-rnd(0, 7)).toFixed(2) + 's';
-      // 色相：金色 / 冰蓝 / 纯白
-      var hue = roll > 0.86 ? '255, 232, 168' : (roll > 0.56 ? '205, 232, 255' : '255, 255, 255');
-      st.style.color = 'rgb(' + hue + ')';
-      st.style.background = 'rgb(' + hue + ')';
-      /* 关键优化：只给极少数"亮星"加光晕与星芒。
-         原来给每颗星都设 box-shadow，等于数百个大范围阴影同时重绘，代价极高。 */
-      if (roll > 0.95) st.className = 'flare big';
-      else if (roll > 0.88) st.className = 'big';
-      container.appendChild(st);
+    var built = 0;
+    for (var li = 0; li < LAYERS.length; li++) {
+      var L = LAYERS[li];
+      var url = starTile(tileSize, tileSize, L.n, L.cols, L.maxR);
+      if (!url) continue;
+      var d = document.createElement('div');
+      d.className = 'star-layer';
+      d.style.backgroundImage = 'url(' + url + ')';
+      d.style.backgroundSize = tileSize + 'px ' + tileSize + 'px';
+      d.style.animationDuration = L.dur;
+      d.style.opacity = L.op;
+      // 三层错开位置，避免完全重合
+      d.style.backgroundPosition = (li * 97) + 'px ' + (li * 61) + 'px';
+      layer.appendChild(d);
+      built++;
     }
-    if (frag) layer.appendChild(frag);
-    /* 这里刻意【不】设置 contain: strict。
-       strict 等价于 size layout paint style，其中：
-         · size containment 会让浏览器无视元素内容的尺寸 ——
-           对一个 position:fixed + inset:0 的层来说本就有确定尺寸，属于误用，
-           还会引入额外的尺寸重算路径；
-         · layout containment 会让该层成为"包含块"，
-           改变内部 absolute 星星的定位基准，属于副作用。
-       这一层本来就铺满视口，隔离收益很小，去掉更稳。 */
+
+    /* 贴图生成失败时（该内核的 canvas 连静态绘制都不可用），
+       退回逐元素方案 —— 会闪但至少有星星。 */
+    if (!built) {
+      var count = narrow ? 55 : 120;
+      for (var i = 0; i < count; i++) {
+        var st = document.createElement('i');
+        var roll = Math.random();
+        var size = roll > 0.93 ? rnd(2.6, 3.8) : (roll > 0.62 ? rnd(1.7, 2.5) : rnd(0.9, 1.6));
+        st.style.left = rnd(-1, 100).toFixed(2) + '%';
+        st.style.top = rnd(-1, 100).toFixed(2) + '%';
+        st.style.width = size.toFixed(1) + 'px';
+        st.style.height = size.toFixed(1) + 'px';
+        st.style.animationDuration = rnd(2.2, 7.4).toFixed(2) + 's';
+        st.style.animationDelay = (-rnd(0, 7)).toFixed(2) + 's';
+        var hue = roll > 0.86 ? '255, 232, 168' : (roll > 0.56 ? '205, 232, 255' : '255, 255, 255');
+        st.style.color = 'rgb(' + hue + ')';
+        st.style.background = 'rgb(' + hue + ')';
+        if (roll > 0.95) st.className = 'flare big';
+        else if (roll > 0.88) st.className = 'big';
+        layer.appendChild(st);
+      }
+      layer.setAttribute('data-fallback', 'per-element');
+    }
 
     /* DOM 版星环：对象池复用 + 只做 transform 缩放。
        优化点：
@@ -1578,6 +1706,9 @@
         vortex.width = nw;
         vortex.height = nh;
       }
+      // 极端内核下可能拿不到 2D 上下文；这里必须早退，
+      // 否则会在启动流程里抛错（本项目在测试中真的踩到过）。
+      if (!vctx) return false;
       vctx.setTransform(d, 0, 0, d, 0, 0);
 
       // 离屏画布与可见画布同尺寸（同样只在变化时重分配）
