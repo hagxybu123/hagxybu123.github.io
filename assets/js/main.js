@@ -623,6 +623,64 @@
     renderMessages();
   }
 
+  /* ------------------------------------------------------------- 开场页 */
+  function initEntry() {
+    var entry = $('#entry');
+    var body = document.body;
+
+    // 已经进过站（同一次会话）就直接跳过开场页
+    var seen = false;
+    try { seen = sessionStorage.getItem('tianyi-entered') === '1'; } catch (e) {}
+    if (!entry || seen) {
+      if (entry && entry.parentNode) entry.parentNode.removeChild(entry);
+      body.classList.remove('is-locked');
+      return;
+    }
+
+    body.classList.add('is-locked');
+
+    var closed = false;
+    function enter() {
+      if (closed) return;
+      closed = true;
+      try { sessionStorage.setItem('tianyi-entered', '1'); } catch (e) {}
+      entry.classList.add('is-gone');
+      body.classList.remove('is-locked');
+      window.setTimeout(function () {
+        if (entry.parentNode) entry.parentNode.removeChild(entry);
+      }, 820);
+    }
+
+    entry.addEventListener('click', enter);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') enter();
+    });
+
+    var btn = $('#entryBtn');
+    if (btn) {
+      btn.addEventListener('click', function (e) { e.stopPropagation(); enter(); });
+      // 键盘可达：把焦点放到按钮上
+      window.setTimeout(function () { try { btn.focus(); } catch (e) {} }, 400);
+    }
+
+    // 兜底：7 秒后自动进入，避免任何情况下卡在开场页
+    window.setTimeout(enter, 7000);
+  }
+
+  /* --------------------------------------------------- 首屏「进入星庭」按钮 */
+  function initEnterButton() {
+    var btn = $('#enterBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function (e) {
+      var target = document.getElementById('about');
+      if (!target) return;      // 没有目标就让浏览器按 href 跳转
+      e.preventDefault();
+      var top = target.getBoundingClientRect().top + (window.scrollY || 0) - 78;
+      window.scrollTo({ top: top, behavior: reduceMotion ? 'auto' : 'smooth' });
+      if (history.replaceState) history.replaceState(null, '', '#about');
+    });
+  }
+
   /* --------------------------------------------------------------- 启动 */
   function boot() {
     // Mark that JS is alive. CSS only hides [data-reveal] elements under
@@ -638,7 +696,9 @@
       ['入场动效', initReveal],
       ['打字机', initTyping],
       ['立绘倾斜', initTilt],
-      ['留言板', initGuestbook]
+      ['留言板', initGuestbook],
+      ['开场页', initEntry],
+      ['进入按钮', initEnterButton]
     ];
 
     for (var i = 0; i < steps.length; i++) {

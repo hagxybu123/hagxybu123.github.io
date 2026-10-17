@@ -61,6 +61,137 @@ html[data-theme="light"] {
   --shadow-sm: 0 12px 30px -20px rgba(28, 48, 96, 0.5);
 }
 
+/* ------------------------------ 开场页 ------------------------------ */
+.entry {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 24px;
+  cursor: pointer;
+  background:
+    radial-gradient(120% 90% at 50% 42%, rgba(30, 52, 120, .55) 0%, rgba(6, 11, 34, .96) 62%, #04081a 100%);
+  backdrop-filter: blur(4px);
+  transition: opacity .75s var(--ease), transform .75s var(--ease), visibility .75s;
+}
+/* 开场页也要有星星 */
+.entry::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: .95;
+  background-image:
+    radial-gradient(2.2px 2.2px at 14% 22%, rgba(255,255,255,.95), transparent 100%),
+    radial-gradient(1.8px 1.8px at 78% 14%, rgba(255,232,170,.9), transparent 100%),
+    radial-gradient(2.6px 2.6px at 44% 68%, rgba(255,255,255,.9), transparent 100%),
+    radial-gradient(1.7px 1.7px at 88% 62%, rgba(210,232,255,.9), transparent 100%),
+    radial-gradient(2.0px 2.0px at 22% 80%, rgba(255,232,170,.85), transparent 100%),
+    radial-gradient(1.6px 1.6px at 62% 34%, rgba(255,255,255,.85), transparent 100%);
+  background-repeat: repeat;
+  background-size: 380px 380px;
+  animation: entry-twinkle 5.5s ease-in-out infinite;
+}
+@keyframes entry-twinkle {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+.entry.is-gone {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(1.06);
+  pointer-events: none;
+}
+/* 兜底：即使脚本完全没跑，开场页也会在 12 秒后自动消失，不会永久挡住页面 */
+@keyframes entry-failsafe {
+  0%, 92% { opacity: 1; visibility: visible; }
+  100% { opacity: 0; visibility: hidden; pointer-events: none; }
+}
+.entry { animation: entry-failsafe 13s linear forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .entry { animation: none; }
+  .entry.is-gone { display: none; }
+}
+.entry-glow {
+  position: absolute;
+  inset: -20%;
+  background: conic-gradient(from 0deg, transparent, rgba(140, 180, 255, .18), transparent 38%);
+  animation: spin 18s linear infinite;
+  pointer-events: none;
+}
+.entry-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: entry-rise 1s var(--ease) both;
+}
+@keyframes entry-rise {
+  from { opacity: 0; transform: translateY(26px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+.entry-ring {
+  position: absolute;
+  top: -14px;
+  width: 176px;
+  height: 176px;
+  border-radius: 50%;
+  border: 1px dashed rgba(160, 200, 255, .5);
+  animation: spin 26s linear infinite;
+  pointer-events: none;
+}
+.entry-avatar {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  object-fit: cover;
+  filter: drop-shadow(0 0 34px rgba(150, 195, 255, .8));
+  animation: entry-float 5s ease-in-out infinite;
+}
+@keyframes entry-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+.entry-title {
+  margin: 14px 0 0;
+  font-size: clamp(1.9rem, 5.2vw, 3.1rem);
+  font-weight: 900;
+  letter-spacing: .06em;
+  background: linear-gradient(105deg, #ffffff 8%, var(--ice-200) 40%, var(--gold) 78%, #ffffff 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 8s ease-in-out infinite;
+  filter: drop-shadow(0 0 26px rgba(160, 200, 255, .5));
+}
+.entry-sub {
+  margin: 0 0 12px;
+  font-size: clamp(.92rem, 2vw, 1.05rem);
+  color: #c3d2f0;
+  letter-spacing: .12em;
+  text-shadow: 0 2px 18px rgba(4, 8, 24, .9);
+}
+.entry-btn {
+  padding: 15px 40px;
+  font-size: 1.02rem;
+  letter-spacing: .16em;
+  animation: entry-pulse 2.8s ease-in-out infinite;
+}
+@keyframes entry-pulse {
+  0%, 100% { box-shadow: 0 18px 46px -16px rgba(160, 200, 255, 1), 0 0 34px -6px rgba(242, 215, 155, .55); }
+  50%      { box-shadow: 0 22px 58px -14px rgba(200, 225, 255, 1), 0 0 56px -2px rgba(242, 215, 155, .95); }
+}
+.entry-hint {
+  margin: 6px 0 0;
+  font-size: .78rem;
+  letter-spacing: .1em;
+  color: var(--text-dim);
+}
+body.is-locked { overflow: hidden; }
+
 /* ------------------------------ 基础 ------------------------------ */
 * { box-sizing: border-box; }
 
