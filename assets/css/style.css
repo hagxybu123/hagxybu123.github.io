@@ -233,7 +233,9 @@ html[data-theme="light"] {
   height: 132px;
   border-radius: 50%;
   object-fit: cover;
-  filter: drop-shadow(0 0 34px rgba(150, 195, 255, .8));
+  /* drop-shadow 用在动画元素上会迫使浏览器每帧重新栅格化；
+     box-shadow 便宜得多，观感几乎一致。 */
+  box-shadow: 0 0 34px 6px rgba(150, 195, 255, .55);
   animation: entry-float 5s ease-in-out infinite;
 }
 @keyframes entry-float {
@@ -251,7 +253,8 @@ html[data-theme="light"] {
   background-clip: text;
   color: transparent;
   animation: shimmer 8s ease-in-out infinite;
-  filter: drop-shadow(0 0 26px rgba(160, 200, 255, .5));
+  /* text-shadow 代替 drop-shadow：文字无需每帧重新栅格化整块区域。 */
+  text-shadow: 0 0 26px rgba(160, 200, 255, .55);
 }
 .entry-sub {
   margin: 0 0 12px;
@@ -285,8 +288,9 @@ html[data-theme="light"] {
   padding: 9px 18px;
   border-radius: 999px;
   border: 1px solid var(--glass-bd-strong);
-  background: rgba(140, 180, 255, .10);
-  backdrop-filter: blur(10px);
+  /* 去掉 backdrop-filter：它需要实时模糊底下正在旋转的漩涡 canvas，
+     每帧都很贵。改用略高的不透明度获得相近观感。 */
+  background: rgba(18, 28, 58, .72);
   color: var(--text-soft);
   font-size: .8rem;
   cursor: pointer;
@@ -308,6 +312,27 @@ html[data-theme="light"] {
 .entry-music.is-on .em-icon { animation: eq 900ms ease-in-out infinite; display: inline-block; }
 .entry-music.is-error .em-text { color: #ffb4b4; }
 body.is-locked { overflow: hidden; }
+
+/* 开场页展示期间，底下这些层完全被 .entry（z-index 200）盖住，
+   但它们的动画仍在每帧重新合成 —— 这是"停留久了越来越卡"的主因之一。
+   直接停掉动画并降低绘制优先级，进站后再恢复。
+   注意：用 visibility 而非 display，避免进站瞬间的布局跳动。 */
+body.is-locked .aurora,
+body.is-locked .grain,
+body.is-locked .sparkles,
+body.is-locked .css-stars,
+body.is-locked #sky {
+  animation-play-state: paused !important;
+}
+body.is-locked .aurora-blob,
+body.is-locked .sparkles span {
+  animation-play-state: paused !important;
+}
+body.is-locked .aurora,
+body.is-locked .grain {
+  /* 被 .entry 完全遮住，没必要参与合成 */
+  opacity: 0 !important;
+}
 
 /* 音频文件缺失时的说明（只在点击后出现） */
 .audio-missing-tip {
@@ -465,9 +490,15 @@ code {
 .aurora-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(90px);
+  /* 这里刻意不加 filter: blur()。
+     原来用 blur(90px)，而这些光斑尺寸达 46vw（全屏级）且在无限动画中 ——
+     等于每帧重新计算一次超大范围的模糊，是"停留久了越来越卡"的主因之一。
+     它们的背景本身就是 radial-gradient(..., transparent 68%)，
+     天然就是柔边渐变，去掉模糊后观感几乎无差别。 */
   opacity: .5;
   animation: drift 26s ease-in-out infinite alternate;
+  transform: translateZ(0);
+  will-change: transform;
 }
 .b1 { width: 46vw; height: 46vw; top: -12vw; left: -8vw; background: radial-gradient(circle, #2b3d8f, transparent 68%); }
 .b2 { width: 40vw; height: 40vw; top: 22vh; right: -10vw; background: radial-gradient(circle, #6b3f8f, transparent 68%); animation-delay: -8s; }
