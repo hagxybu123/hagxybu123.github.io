@@ -1041,8 +1041,10 @@ html[data-theme="light"] .to-top { background: rgba(255, 255, 255, .8); }
 .to-top svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ------------------------------ 入场动效 ------------------------------ */
-/* 默认可见：CSS 只在 JS 确认存活（html.js-ready）后才把元素藏起来，
-   这样即使脚本出错，页面内容也不会变成一片空白。 */
+/* 三级兜底，确保内容在任何情况下都不会永久消失：
+   1) 默认可见；
+   2) 只有 JS 确认存活（html.js-ready）才隐藏，交给 IntersectionObserver 渐显；
+   3) 万一 JS 没跑（被拦截/报错），纯 CSS 动画在 1.6 秒后自动把全部内容显示出来。 */
 [data-reveal] {
   opacity: 1;
   transform: none;
@@ -1052,8 +1054,18 @@ html.js-ready [data-reveal] {
   transform: translateY(26px);
   transition: opacity .85s var(--ease), transform .85s var(--ease);
   will-change: opacity, transform;
+  animation: reveal-failsafe 0s linear 1.6s forwards;
 }
-html.js-ready [data-reveal].is-in { opacity: 1; transform: none; }
+html.js-ready [data-reveal].is-in { opacity: 1; transform: none; animation: none; }
+
+/* 不依赖任何脚本的最终保障 */
+@keyframes reveal-failsafe {
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.js-ready [data-reveal],
+  html.js-ready [data-reveal].is-in { opacity: 1; transform: none; animation: none; }
+}
 
 /* ------------------------------ 响应式 ------------------------------ */
 @media (max-width: 1024px) {
