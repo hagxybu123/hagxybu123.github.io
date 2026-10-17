@@ -1464,6 +1464,19 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
 .guest-form.is-sending button[type="submit"] { opacity: .55; cursor: progress; }
 .guest-form.is-sending button[type="submit"] svg { animation: spin 1s linear infinite; }
 
+/* 留言条数提示：让访客一眼看出"这里有人来过" */
+.guest-count {
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 215, 155, .42);
+  background: rgba(242, 215, 155, .12);
+  color: var(--gold);
+  font-size: .72rem;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
 .empty-hint { margin: 16px 0 0; font-size: .86rem; color: var(--text-dim); }
 
 /* ------------------------------ 角色专区 ------------------------------ */

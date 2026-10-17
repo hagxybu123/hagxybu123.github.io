@@ -89,7 +89,15 @@
     var frameId = null;
 
     function resize() {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      /* 手机上把画布分辨率压到 1.5 倍，桌面保持 2 倍。
+         原因（实测数据）：手机 dpr=3 时画布是 1170x2532，而本场景每帧要叠加
+         4 道 lighter 混合层（星云/极光/光柱/星点）。手机的瓶颈不是绘制调用数
+         （实测仅 596/帧，远低于预算），而是**填充率** —— 每个像素被混合 4 次，
+         GPU 吞吐不足就会掉帧撕裂，也就是用户反馈的"闪屏"。
+         画布内容本身就是柔和光晕，1.5 倍与 3 倍在观感上几乎无差别。 */
+      var isNarrow = window.innerWidth < 760;
+      var maxDpr = isNarrow ? 1.5 : 2;
+      dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
       w = canvas.clientWidth = window.innerWidth;
       h = canvas.clientHeight = window.innerHeight;
       canvas.width = Math.floor(w * dpr);
@@ -157,9 +165,10 @@
       }
 
       // 极光帘幕：几道缓慢横向漂移的竖直柔光，每道独立呼吸
+      // 手机上只留 1 道：每道都是半屏以上的混合层，填充率优先
       aurora = [];
       var auroraDefs = mobile
-        ? [[0.22, '150, 255, 220'], [0.68, '190, 170, 255']]
+        ? [[0.42, '160, 245, 225']]
         : [[0.16, '150, 255, 220'], [0.44, '205, 232, 255'], [0.72, '198, 178, 255'], [0.89, '255, 190, 220']];
       for (var au = 0; au < auroraDefs.length; au++) {
         aurora.push({
@@ -176,11 +185,12 @@
         });
       }
 
-      // 深空漫射光柱：几道斜向的柔光，缓慢明灭（氛围感主力之一）
+      /* 深空漫射光柱：几道斜向的柔光，缓慢明灭（氛围感主力之一）
+         手机上直接关掉：它几乎铺满全屏（ht 达 1.0~1.5 倍视高），
+         是全屏级别的 lighter 混合层。手机闪屏的根因是填充率而非绘制调用数，
+         所以优先砍掉这类"满屏混合"，视觉差异很小但填充率下降明显。 */
       shafts = [];
-      var shaftDefs = mobile
-        ? [[0.30, -14, '150, 200, 255'], [0.72, 12, '198, 178, 255']]
-        : [[0.18, -16, '150, 200, 255'], [0.42, -7, '205, 232, 255'],
+      var shaftDefs = mobile ? [] : [[0.18, -16, '150, 200, 255'], [0.42, -7, '205, 232, 255'],
            [0.63, 8, '198, 178, 255'], [0.86, 15, '255, 190, 220']];
       for (var sh = 0; sh < shaftDefs.length; sh++) {
         shafts.push({
@@ -196,12 +206,18 @@
       }
 
       // 星云：亮色云团（中心实、边缘透），是"星光感"的主体
-      clouds = [
-        { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.44, vx: 0.022, vy: 0.011, c: [104, 152, 255], a: 0.92 },
-        { x: w * 0.82, y: h * 0.18, r: Math.max(w, h) * 0.40, vx: -0.016, vy: 0.013, c: [178, 118, 250], a: 0.86 },
-        { x: w * 0.55, y: h * 0.72, r: Math.max(w, h) * 0.48, vx: 0.012, vy: -0.015, c: [64, 186, 240], a: 0.78 },
-        { x: w * 0.42, y: h * 0.12, r: Math.max(w, h) * 0.30, vx: -0.010, vy: 0.014, c: [242, 205, 140], a: 0.55 }
-      ];
+      // 每个云团都是一个覆盖大半屏的径向混合层 —— 手机上只留 2 个
+      clouds = mobile
+        ? [
+            { x: w * 0.22, y: h * 0.26, r: Math.max(w, h) * 0.46, vx: 0.020, vy: 0.011, c: [104, 152, 255], a: 0.92 },
+            { x: w * 0.78, y: h * 0.62, r: Math.max(w, h) * 0.42, vx: -0.014, vy: 0.012, c: [178, 118, 250], a: 0.80 }
+          ]
+        : [
+            { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.44, vx: 0.022, vy: 0.011, c: [104, 152, 255], a: 0.92 },
+            { x: w * 0.82, y: h * 0.18, r: Math.max(w, h) * 0.40, vx: -0.016, vy: 0.013, c: [178, 118, 250], a: 0.86 },
+            { x: w * 0.55, y: h * 0.72, r: Math.max(w, h) * 0.48, vx: 0.012, vy: -0.015, c: [64, 186, 240], a: 0.78 },
+            { x: w * 0.42, y: h * 0.12, r: Math.max(w, h) * 0.30, vx: -0.010, vy: 0.014, c: [242, 205, 140], a: 0.55 }
+          ];
     }
 
     function palette(hue) {
@@ -334,17 +350,23 @@
       }
     }
 
-    // 自适应画质：连续掉帧就减少星点数量，避免长时间停留后卡顿/闪屏
+    /* 自适应画质：连续掉帧就降低星空密度。
+       参数按设备分档 —— 手机 GPU 弱得多，需要更早、更狠地降级。
+       用户实测反馈"手机还是会闪"，说明原来的 90 帧门槛 + 25% 步长太保守。 */
+    var isMobileDevice = window.innerWidth < 760;
     var slowStreak = 0, quality = 1;
-    // 帧率上限：15ms 约等于 60fps，只用于拦住 120Hz 高刷屏的翻倍负载，
-    // 不能设太高，否则 60Hz 屏幕会被整帧跳过（画面反而卡）。
-    var FRAME_FLOOR = 15;
+    var SLOW_MS = isMobileDevice ? 26 : 34;         // 超过这个帧时长算掉帧
+    var SLOW_LIMIT = isMobileDevice ? 30 : 90;      // 连续多少帧后降级
+    var QUALITY_STEP = isMobileDevice ? 0.34 : 0.25;
+    var QUALITY_FLOOR = isMobileDevice ? 0.22 : 0.35;
+    // 帧率上限：15ms 约 60fps，用于拦住 120Hz 高刷屏的翻倍负载。
+    // 手机上放宽到 12ms，避免与 60Hz 刷新周期打架导致偶发跳帧（那也是"闪"的来源之一）。
+    var FRAME_FLOOR = isMobileDevice ? 12 : 15;
 
     function frame(ts) {
       if (!last) last = ts;
       var rawDt = ts - last;
 
-      // 帧率上限：不到 21ms 就跳过这一帧，降低 GPU 持续负载
       if (rawDt < FRAME_FLOOR) {
         frameId = window.requestAnimationFrame(frame);
         return;
@@ -352,16 +374,17 @@
       last = ts;
       var dt = rawDt > 50 ? 2 : rawDt / 16.67;
 
-      // 连续 90 帧耗时过长 -> 降级一次（最多降 3 档，每次减 25% 星点）
-      if (rawDt > 34) {
+      if (rawDt > SLOW_MS) {
         slowStreak++;
-        if (slowStreak > 90 && quality > 0.35) {
-          quality -= 0.25;
+        if (slowStreak > SLOW_LIMIT && quality > QUALITY_FLOOR) {
+          quality -= QUALITY_STEP;
           slowStreak = 0;
           var keep = Math.max(40, Math.round(stars.length * quality));
           if (keep < stars.length) stars.length = keep;
-          var keepDrift = Math.max(20, Math.round(drift.length * quality));
+          var keepDrift = Math.max(16, Math.round(drift.length * quality));
           if (keepDrift < drift.length) drift.length = keepDrift;
+          // 手机上同时砍掉云团（每个都是大半屏的混合层）
+          if (isMobileDevice && clouds.length > 1) clouds.length = clouds.length - 1;
           if (window.console && console.info) {
             console.info('[星庭] 检测到持续掉帧，已自动降低星空密度到 ' + Math.round(quality * 100) + '%');
           }
@@ -1116,9 +1139,12 @@
   function renderMessages(data, placeholder) {
     var list = $('#guestList');
     var empty = $('#emptyHint');
+    var countEl = $('#guestCount');
     if (!list) return;
     var rows = data || [];
     list.innerHTML = '';
+
+    if (countEl) countEl.textContent = rows.length ? rows.length + ' 条' : '';
 
     if (placeholder) {
       // 加载中 / 加载失败：给一行灰字，而不是空白，避免让人以为"没有留言"
@@ -1168,7 +1194,11 @@
       return { online: true, count: rows.length };
     }).catch(function () {
       var cached = readMessages();
-      renderMessages(cached, cached.length ? '' : '星简暂时读不到（网络或服务未就绪）');
+      // 提示写清楚一点：多数情况下是"读不到"，而不是"没人留言"
+      var hint = cached.length
+        ? ''
+        : '留言暂时读不到（网络或服务未就绪）—— 你写的留言会送到服务器，别人也能看到';
+      renderMessages(cached, hint);
       return { error: true };
     });
   }
