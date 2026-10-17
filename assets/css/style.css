@@ -357,7 +357,7 @@ body {
   text-rendering: optimizeLegibility;
   /* 全页背景：NASA 实拍星空（公有领域），固定不随滚动 */
   background-color: var(--navy-900);
-  background-image: url("../img/sky-bg.jpg");
+  background-image: url("../img/sky-bg-v3.jpg");
   background-size: cover;
   background-position: center center;
   background-attachment: fixed;
