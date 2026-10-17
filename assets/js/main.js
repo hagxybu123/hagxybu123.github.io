@@ -24,9 +24,11 @@
 
     var stars = [];
     var dust = [];
+    var drift = [];
     var comets = [];
     var clouds = [];
     var sparks = [];
+    var rings = [];
     var w = 0, h = 0, dpr = 1;
     var scrollY = window.scrollY || 0;
     var mx = -9999, my = -9999;
@@ -48,10 +50,10 @@
       stars = [];
       // 窄屏（手机）自动降级，保证 60fps 不掉帧
       var mobile = w < 760;
-      var density = mobile ? 9000 : 5200;
-      var cap = mobile ? 190 : 380;
-      var count = Math.round(Math.min(cap, Math.max(mobile ? 90 : 160, (w * h) / density)));
-      var flareRate = mobile ? 0.55 : 0.32;
+      var density = mobile ? 6000 : 3200;
+      var cap = mobile ? 260 : 560;
+      var count = Math.round(Math.min(cap, Math.max(mobile ? 120 : 220, (w * h) / density)));
+      var flareRate = mobile ? 0.55 : 0.34;
       for (var i = 0; i < count; i++) {
         var roll = Math.random();
         var hue = roll > 0.58 ? 'gold' : (roll > 0.26 ? 'ice' : 'white');
@@ -81,6 +83,24 @@
           a: rnd(0.35, 0.8),
           hue: Math.random() > 0.32 ? 'gold' : 'ice',
           ph: Math.random() * 6.28
+        });
+      }
+
+      // 横向漂移的星点：让星空"整个在动"，而不是只有闪烁
+      drift = [];
+      var nDrift = Math.round(Math.min(mobile ? 60 : 130, Math.max(30, (w * h) / 15000)));
+      for (var f = 0; f < nDrift; f++) {
+        var rollD = Math.random();
+        drift.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: rnd(1.0, 3.0),
+          vx: rnd(0.10, 0.55) * (Math.random() > 0.22 ? 1 : -1),
+          vy: rnd(-0.07, 0.07),
+          a: rnd(0.40, 1),
+          tw: rnd(0.008, 0.03),
+          dir: Math.random() > 0.5 ? 1 : -1,
+          hue: rollD > 0.55 ? 'gold' : (rollD > 0.24 ? 'ice' : 'white')
         });
       }
 
@@ -116,16 +136,29 @@
       });
     }
 
+    // 点击爆开：星环冲击波 + 中心闪光 + 四散金蓝星火
     function addSpark(x, y) {
-      var n = 26;
+      // ① 三道扩散星环，速度与粗细各异，形成冲击波层次
+      rings.push({ x: x, y: y, life: 1, r: 0, grow: rnd(4.6, 6.2), decay: rnd(0.016, 0.022), w: 3.2, hue: 'gold' });
+      rings.push({ x: x, y: y, life: 1, r: 10, grow: rnd(3.0, 4.0), decay: rnd(0.020, 0.027), w: 2.0, hue: 'ice' });
+      rings.push({ x: x, y: y, life: 1, r: 22, grow: rnd(1.8, 2.6), decay: rnd(0.026, 0.034), w: 1.2, hue: 'white' });
+
+      // ② 中心闪光
+      rings.push({ x: x, y: y, life: 1, r: 0, grow: 0, decay: 0.055, w: 0, hue: 'flash' });
+
+      // ③ 四散星火，带一点切向速度让轨迹卷曲成漩涡状
+      var n = 34;
       for (var i = 0; i < n; i++) {
-        var ang = (Math.PI * 2 * i) / n + rnd(-0.2, 0.2);
-        var sp = rnd(1.5, 6.4);
+        var ang = (Math.PI * 2 * i) / n + rnd(-0.18, 0.18);
+        var sp = rnd(1.8, 7.6);
         sparks.push({
           x: x, y: y,
-          vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
-          life: 1, decay: rnd(0.012, 0.028),
-          hue: Math.random() > 0.35 ? 'gold' : 'ice'
+          vx: Math.cos(ang) * sp,
+          vy: Math.sin(ang) * sp,
+          spin: rnd(-0.10, 0.10),
+          life: 1,
+          decay: rnd(0.010, 0.026),
+          hue: Math.random() > 0.38 ? 'gold' : 'ice'
         });
       }
     }
@@ -178,6 +211,47 @@
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // 漂移星点：横向缓慢掠过，让整片星空"在动"
+      ctx.globalCompositeOperation = 'lighter';
+      for (var dr = 0; dr < drift.length; dr++) {
+        var ds = drift[dr];
+        ds.x += ds.vx * dt;
+        ds.y += ds.vy * dt;
+        ds.a += ds.tw * ds.dir * dt;
+        if (ds.a >= 1) { ds.a = 1; ds.dir = -1; }
+        if (ds.a <= 0.42) { ds.a = 0.42; ds.dir = 1; }
+        // 环绕
+        if (ds.x < -14) ds.x = w + 12;
+        if (ds.x > w + 14) ds.x = -12;
+        if (ds.y < -14) ds.y = h + 12;
+        if (ds.y > h + 14) ds.y = -12;
+
+        var dcol = palette(ds.hue);
+        // 沿运动方向拉出短拖尾，一眼能看出"在移动"
+        var tl = 2.6 + Math.abs(ds.vx) * 7;
+        var dg = ctx.createLinearGradient(ds.x, ds.y, ds.x - ds.vx * tl, ds.y - ds.vy * tl);
+        dg.addColorStop(0, 'rgba(' + dcol + ', ' + (ds.a * 0.85).toFixed(3) + ')');
+        dg.addColorStop(1, 'rgba(' + dcol + ', 0)');
+        ctx.strokeStyle = dg;
+        ctx.lineWidth = ds.r * 0.85;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(ds.x, ds.y);
+        ctx.lineTo(ds.x - ds.vx * tl, ds.y - ds.vy * tl);
+        ctx.stroke();
+
+        // 星点本体 + 白芯
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(' + dcol + ', ' + ds.a.toFixed(3) + ')';
+        ctx.arc(ds.x, ds.y, ds.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + (ds.a * 0.92).toFixed(3) + ')';
+        ctx.arc(ds.x, ds.y, ds.r * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
 
       // 星点：闪烁 + 视差 + 鼠标高亮
       for (var s = 0; s < stars.length; s++) {
@@ -280,23 +354,74 @@
         if (cm.life <= 0 || cm.x < -w * 0.6 || cm.x > w * 1.6 || cm.y > h * 1.4) comets.splice(m, 1);
       }
 
+      // 点击爆开：扩散星环 + 中心闪光
+      for (var rg = rings.length - 1; rg >= 0; rg--) {
+        var rn = rings[rg];
+        rn.life -= rn.decay * dt;
+        if (rn.life <= 0) { rings.splice(rg, 1); continue; }
+
+        if (rn.hue === 'flash') {
+          // 中心闪光：一团快速衰减的白色光球
+          var fl = rn.life;
+          var fg2 = ctx.createRadialGradient(rn.x, rn.y, 0, rn.x, rn.y, 74 * fl);
+          fg2.addColorStop(0, 'rgba(255, 255, 255, ' + Math.min(1, fl * 1.1).toFixed(3) + ')');
+          fg2.addColorStop(0.35, 'rgba(255, 236, 190, ' + (fl * 0.65).toFixed(3) + ')');
+          fg2.addColorStop(1, 'rgba(255, 220, 160, 0)');
+          ctx.fillStyle = fg2;
+          ctx.beginPath();
+          ctx.arc(rn.x, rn.y, 74 * fl, 0, Math.PI * 2);
+          ctx.fill();
+          continue;
+        }
+
+        rn.r += rn.grow * dt;
+        var rc = rn.hue === 'gold' ? '255, 226, 150' : (rn.hue === 'ice' ? '190, 224, 255' : '255, 255, 255');
+        // 环本体
+        ctx.strokeStyle = 'rgba(' + rc + ', ' + Math.min(1, rn.life * 1.15).toFixed(3) + ')';
+        ctx.lineWidth = Math.max(0.6, rn.w * rn.life);
+        ctx.beginPath();
+        ctx.arc(rn.x, rn.y, rn.r, 0, Math.PI * 2);
+        ctx.stroke();
+        // 环外一圈柔光，让冲击波有厚度
+        ctx.strokeStyle = 'rgba(' + rc + ', ' + (rn.life * 0.22).toFixed(3) + ')';
+        ctx.lineWidth = Math.max(1, rn.w * rn.life * 4.5);
+        ctx.beginPath();
+        ctx.arc(rn.x, rn.y, rn.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       // 点击爆开的星光
       for (var k = sparks.length - 1; k >= 0; k--) {
         var sp = sparks[k];
         sp.x += sp.vx * dt;
         sp.y += sp.vy * dt;
-        sp.vx *= 0.975;
-        sp.vy *= 0.975;
+        // 切向分量 -> 轨迹卷曲，像被星环甩出去
+        if (sp.spin) {
+          var tvx = -sp.vy * sp.spin;
+          var tvy = sp.vx * sp.spin;
+          sp.vx += tvx * dt;
+          sp.vy += tvy * dt;
+        }
+        sp.vx *= 0.976;
+        sp.vy *= 0.976;
         sp.life -= sp.decay * dt;
         if (sp.life <= 0) { sparks.splice(k, 1); continue; }
         var scol = sp.hue === 'gold' ? '255, 226, 150' : '200, 230, 255';
+        // 拖尾：从上一帧位置拉一条渐隐线
+        var pxx = sp.x - sp.vx * 1.6, pyy = sp.y - sp.vy * 1.6;
+        ctx.strokeStyle = 'rgba(' + scol + ', ' + (sp.life * 0.55).toFixed(3) + ')';
+        ctx.lineWidth = Math.max(0.6, sp.life * 1.8);
+        ctx.beginPath();
+        ctx.moveTo(pxx, pyy);
+        ctx.lineTo(sp.x, sp.y);
+        ctx.stroke();
         // 先画一圈光晕再画芯，金色才会"炸"出来
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + scol + ', ' + (sp.life * 0.25).toFixed(3) + ')';
-        ctx.arc(sp.x, sp.y, 5.5 * sp.life, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + scol + ', ' + (sp.life * 0.28).toFixed(3) + ')';
+        ctx.arc(sp.x, sp.y, 6 * sp.life, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + scol + ', ' + Math.min(1, sp.life * 1.2).toFixed(3) + ')';
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, sp.life * 1.25).toFixed(3) + ')';
         ctx.arc(sp.x, sp.y, 1.9 * sp.life, 0, Math.PI * 2);
         ctx.fill();
       }
