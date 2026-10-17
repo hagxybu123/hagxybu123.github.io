@@ -1834,7 +1834,7 @@
       launcher.setAttribute('aria-expanded', 'true');
       if (!greeted) {
         greeted = true;
-        typingThen('……你来了。星庭今天没什么人，随便看看吧。<br>想问我什么就问，我不一定答，答了就一定是真的。<br><span style="opacity:.62">（小提示：按住鼠标在星空里拖一下，星星会跟着你走。别谢我。）</span>', 700);
+        typingThen('……你来了。星庭今天没什么人，随便看看吧。<br>想问我什么就问，我不一定答，答了就一定是真的。<br><span style="display:inline-block;margin-top:7px;padding:5px 11px;border-radius:999px;background:rgba(242,215,155,.15);border:1px solid rgba(242,215,155,.42);color:#f2d79b;font-size:.86em">✦ 试试按住鼠标在星空里拖动，星星会跟着你走</span>', 700);
       }
       window.setTimeout(function () { try { input.focus(); } catch (e) {} }, 120);
     }
