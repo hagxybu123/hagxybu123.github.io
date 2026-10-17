@@ -143,8 +143,13 @@ html[data-theme="light"] {
   padding: 24px;
   cursor: pointer;
   background:
-    radial-gradient(120% 90% at 50% 42%, rgba(30, 52, 120, .55) 0%, rgba(6, 11, 34, .96) 62%, #04081a 100%);
-  backdrop-filter: blur(4px);
+    /* 这里刻意不加 backdrop-filter。
+       它做的是【全屏】背景模糊，而开场页底下有正在旋转的 .entry-glow ——
+       等于每帧重算一次全屏模糊。X5 内核对 backdrop-filter 尤其敏感，
+       实测这是开场闪屏的主因之一。
+       遮罩本身已是 96% 不透明的深色，去掉模糊后几乎看不出差异，
+       因此把中心那层略为提高一点不透明度作为补偿。 */
+    radial-gradient(120% 90% at 50% 42%, rgba(30, 52, 120, .62) 0%, rgba(6, 11, 34, .97) 62%, #04081a 100%);
   transition: opacity .75s var(--ease), transform .75s var(--ease), visibility .75s;
 }
 /* 开场页也要有星星 */
@@ -224,9 +229,23 @@ html[data-theme="light"] {
   width: 176px;
   height: 176px;
   border-radius: 50%;
-  border: 1px dashed rgba(160, 200, 255, .5);
+  /* 不用 border: dashed —— 虚线边在旋转时，浏览器需要重新生成虚线花纹并重绘。
+     改用 repeating-conic-gradient 画出等价的虚线点，纹理是静态的：
+     旋转时只需合成层的 transform，不再重绘花纹。
+     再用 radial-gradient 做环形遮罩，只保留最外一圈。 */
+  background: repeating-conic-gradient(
+    rgba(160, 200, 255, .55) 0deg 4deg,
+    transparent 4deg 12deg
+  );
+  -webkit-mask: radial-gradient(circle,
+    transparent calc(50% - 1px), #000 calc(50% - 1px),
+    #000 calc(50% + 1px), transparent calc(50% + 1px));
+  mask: radial-gradient(circle,
+    transparent calc(50% - 1px), #000 calc(50% - 1px),
+    #000 calc(50% + 1px), transparent calc(50% + 1px));
   animation: spin 26s linear infinite;
   pointer-events: none;
+  will-change: transform;
 }
 .entry-avatar {
   width: 132px;
@@ -842,6 +861,9 @@ body::after {
     linear-gradient(180deg, rgba(2, 4, 14, .45) 0%, transparent 18%, transparent 82%, rgba(2, 4, 14, .55) 100%);
 }
 @keyframes shimmer {
+  /* 说明：这条动画只在【极少数小面积元素】上使用（标题、渐变文字）。
+     动 background-position 会重绘渐变纹理，但面积小、且不带大型滤镜，
+     在 X5 下可接受。开场页标题的可见阴影已从 drop-shadow 改为 text-shadow。 */
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
 }
@@ -2147,6 +2169,16 @@ html:not(.use-css-stars) .css-stars * {
 
 /* 汇聚时整体轻微收缩 + 淡出，替代 canvas 的"吸入" */
 .entry.is-css-tear { animation: css-tear-out 1.5s cubic-bezier(.4, 0, .2, 1) forwards; }
+
+/* 收尾动画期间，把内部这些"独立小动画"停掉：
+   它们此刻都被外层的收缩淡出盖住，继续跑只是白白消耗帧时间。
+   注意：虚线环（.entry-ring）旋转时会重绘虚线花纹，是这几项里最贵的。 */
+.entry.is-css-tear .entry-ring,
+.entry.is-css-tear .entry-glow,
+.entry.is-css-tear .entry-avatar,
+.entry.is-css-tear::before {
+  animation-play-state: paused !important;
+}
 
 @keyframes css-tear-out {
   0%   { opacity: 1; transform: scale(1); }
