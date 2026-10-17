@@ -289,8 +289,11 @@ html[data-theme="light"] {
   animation: entry-pulse 2.8s ease-in-out infinite;
 }
 @keyframes entry-pulse {
-  0%, 100% { box-shadow: 0 18px 46px -16px rgba(160, 200, 255, 1), 0 0 34px -6px rgba(242, 215, 155, .55); }
-  50%      { box-shadow: 0 22px 58px -14px rgba(200, 225, 255, 1), 0 0 56px -2px rgba(242, 215, 155, .95); }
+  /* 原来逐帧插值 box-shadow。改为透明度 + 轻微缩放的脉动，
+     静态的光晕由元素自身的 box-shadow 提供（只栅格化一次）。 */
+  0%, 100% { transform: scale(1); opacity: .96; }
+  50%      { transform: scale(1.025); opacity: 1; }
+
 }
 .entry-hint {
   margin: 6px 0 0;
@@ -860,12 +863,12 @@ body::after {
     radial-gradient(115% 78% at 50% 42%, transparent 42%, rgba(2, 4, 14, .58) 100%),
     linear-gradient(180deg, rgba(2, 4, 14, .45) 0%, transparent 18%, transparent 82%, rgba(2, 4, 14, .55) 100%);
 }
+/* 原实现动 background-position，会重绘整块渐变纹理。
+   现在改为"静态渐变 + 一条用 transform 位移的高光带"（见 .shimmer-band），
+   关键帧本身只负责位移，属于合成属性。 */
 @keyframes shimmer {
-  /* 说明：这条动画只在【极少数小面积元素】上使用（标题、渐变文字）。
-     动 background-position 会重绘渐变纹理，但面积小、且不带大型滤镜，
-     在 X5 下可接受。开场页标题的可见阴影已从 drop-shadow 改为 text-shadow。 */
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  0%   { transform: translateX(-60%); }
+  100% { transform: translateX(160%); }
 }
 
 .hero-sub {
@@ -1554,8 +1557,11 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
   animation: avatar-breathe 6.5s ease-in-out infinite;
 }
 @keyframes avatar-breathe {
-  0%, 100% { box-shadow: 0 24px 60px -26px rgba(90, 140, 255, .95), 0 0 0 10px rgba(140, 180, 255, .07); }
-  50%      { box-shadow: 0 28px 70px -24px rgba(120, 170, 255, 1),  0 0 0 16px rgba(140, 180, 255, .13); }
+  /* 原来逐帧插值 box-shadow 的模糊半径 —— 每帧都要重算阴影，代价极高。
+     改为只做极轻微的缩放：呼吸感依然在，但完全走合成线程。 */
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.015); }
+
 }
 .character-visual::after {
   content: "";
