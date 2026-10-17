@@ -229,23 +229,26 @@ html[data-theme="light"] {
   width: 176px;
   height: 176px;
   border-radius: 50%;
-  /* 不用 border: dashed —— 虚线边在旋转时，浏览器需要重新生成虚线花纹并重绘。
-     改用 repeating-conic-gradient 画出等价的虚线点，纹理是静态的：
-     旋转时只需合成层的 transform，不再重绘花纹。
-     再用 radial-gradient 做环形遮罩，只保留最外一圈。 */
-  background: repeating-conic-gradient(
-    rgba(160, 200, 255, .55) 0deg 4deg,
-    transparent 4deg 12deg
-  );
-  -webkit-mask: radial-gradient(circle,
-    transparent calc(50% - 1px), #000 calc(50% - 1px),
-    #000 calc(50% + 1px), transparent calc(50% + 1px));
-  mask: radial-gradient(circle,
-    transparent calc(50% - 1px), #000 calc(50% - 1px),
-    #000 calc(50% + 1px), transparent calc(50% + 1px));
   animation: spin 26s linear infinite;
   pointer-events: none;
   will-change: transform;
+  /* 12 个 2px 小圆点均匀围成一圈，代替原来的虚线环。
+     关键：不再使用 repeating-conic-gradient 与 mask ——
+     那两者在旋转时每帧都要重算遮罩/角向渐变，比虚线还贵。
+     现在背景是静态贴好的点，旋转只需合成层的 transform。 */
+  background:
+    radial-gradient(2px 2px at 50% 0%, rgba(160, 200, 255, .62) 50%, transparent 51%),
+    radial-gradient(2px 2px at 75% 6.7%, rgba(160, 200, 255, .5) 50%, transparent 51%),
+    radial-gradient(2px 2px at 93.3% 25%, rgba(160, 200, 255, .62) 50%, transparent 51%),
+    radial-gradient(2px 2px at 100% 50%, rgba(160, 200, 255, .5) 50%, transparent 51%),
+    radial-gradient(2px 2px at 93.3% 75%, rgba(160, 200, 255, .62) 50%, transparent 51%),
+    radial-gradient(2px 2px at 75% 93.3%, rgba(160, 200, 255, .5) 50%, transparent 51%),
+    radial-gradient(2px 2px at 50% 100%, rgba(160, 200, 255, .62) 50%, transparent 51%),
+    radial-gradient(2px 2px at 25% 93.3%, rgba(160, 200, 255, .5) 50%, transparent 51%),
+    radial-gradient(2px 2px at 6.7% 75%, rgba(160, 200, 255, .62) 50%, transparent 51%),
+    radial-gradient(2px 2px at 0% 50%, rgba(160, 200, 255, .5) 50%, transparent 51%),
+    radial-gradient(2px 2px at 6.7% 25%, rgba(160, 200, 255, .62) 50%, transparent 51%),
+    radial-gradient(2px 2px at 25% 6.7%, rgba(160, 200, 255, .5) 50%, transparent 51%);
 }
 .entry-avatar {
   width: 132px;
@@ -256,6 +259,7 @@ html[data-theme="light"] {
      box-shadow 便宜得多，观感几乎一致。 */
   box-shadow: 0 0 34px 6px rgba(150, 195, 255, .55);
   animation: entry-float 5s ease-in-out infinite;
+  will-change: transform;
 }
 @keyframes entry-float {
   0%, 100% { transform: translateY(0); }
@@ -792,9 +796,20 @@ html[data-theme="light"] .hero-veil {
   position: absolute;
   inset: -12px;
   border-radius: 50%;
-  border: 1px dashed rgba(170, 205, 255, .55);
   animation: spin 26s linear infinite;
   pointer-events: none;
+  background:
+    radial-gradient(2.4px 2.4px at 50.00% 0.00%, rgba(190, 220, 255, .5) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 79.39% 9.55%, rgba(190, 220, 255, .32) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 97.55% 34.55%, rgba(190, 220, 255, .5) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 97.55% 65.45%, rgba(190, 220, 255, .32) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 79.39% 90.45%, rgba(190, 220, 255, .5) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 50.00% 100.00%, rgba(190, 220, 255, .32) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 20.61% 90.45%, rgba(190, 220, 255, .5) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 2.45% 65.45%, rgba(190, 220, 255, .32) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 2.45% 34.55%, rgba(190, 220, 255, .5) 50%, transparent 51%),
+    radial-gradient(2.4px 2.4px at 20.61% 9.55%, rgba(190, 220, 255, .32) 50%, transparent 51%);
+  will-change: transform;
 }
 .hero-badge::after {
   content: "";
@@ -1555,6 +1570,8 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
   border: 1px solid var(--glass-bd-strong);
   box-shadow: 0 24px 60px -26px rgba(90, 140, 255, .95), 0 0 0 10px rgba(140, 180, 255, .07);
   animation: avatar-breathe 6.5s ease-in-out infinite;
+  will-change: transform;
+  transform: translateZ(0);
 }
 @keyframes avatar-breathe {
   /* 原来逐帧插值 box-shadow 的模糊半径 —— 每帧都要重算阴影，代价极高。
@@ -1563,14 +1580,24 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
   50%      { transform: scale(1.015); }
 
 }
+/* 原来用 border: 1px dashed + 旋转 —— 虚线边框旋转时浏览器要重新生成
+   虚线花纹并重绘整圈，这正是"头像在移动时有点卡"的原因。
+   改为静态圆点环（与开场页外环同一手法），旋转只走合成层。 */
 .character-visual::after {
   content: "";
   position: absolute;
   inset: -18px;
   border-radius: 50%;
-  border: 1px dashed rgba(150, 190, 255, .28);
-  animation: spin 34s linear infinite;
   pointer-events: none;
+  animation: spin 34s linear infinite;
+  will-change: transform;
+  background:
+    radial-gradient(3px 3px at 50% 0%, rgba(150, 190, 255, .45) 50%, transparent 51%),
+    radial-gradient(3px 3px at 93.3% 25%, rgba(150, 190, 255, .38) 50%, transparent 51%),
+    radial-gradient(3px 3px at 93.3% 75%, rgba(150, 190, 255, .45) 50%, transparent 51%),
+    radial-gradient(3px 3px at 50% 100%, rgba(150, 190, 255, .38) 50%, transparent 51%),
+    radial-gradient(3px 3px at 6.7% 75%, rgba(150, 190, 255, .45) 50%, transparent 51%),
+    radial-gradient(3px 3px at 6.7% 25%, rgba(150, 190, 255, .38) 50%, transparent 51%);
 }
 .character-badge {
   position: absolute;
@@ -1676,9 +1703,18 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
   position: absolute;
   inset: -9px;
   border-radius: 50%;
-  border: 1px dashed rgba(170, 205, 255, .55);
   animation: spin 22s linear infinite;
   pointer-events: none;
+  background:
+    radial-gradient(2.2px 2.2px at 50.00% 0.00%, rgba(190, 220, 255, .45) 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 85.36% 14.64%, rgba(190, 220, 255, .28) 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 100.00% 50.00%, rgba(190, 220, 255, .45) 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 85.36% 85.36%, rgba(190, 220, 255, .28) 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 50.00% 100.00%, rgba(190, 220, 255, .45) 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 14.64% 85.36%, rgba(190, 220, 255, .28) 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 0.00% 50.00%, rgba(190, 220, 255, .45) 50%, transparent 51%),
+    radial-gradient(2.2px 2.2px at 14.64% 14.64%, rgba(190, 220, 255, .28) 50%, transparent 51%);
+  will-change: transform;
 }
 .ai-badge {
   position: absolute;
@@ -2182,7 +2218,10 @@ html:not(.use-css-stars) .css-stars * {
 .entry.is-css-tear .entry-ring,
 .entry.is-css-tear .entry-glow,
 .entry.is-css-tear .entry-avatar,
+.entry.is-css-tear .entry-title,
 .entry.is-css-tear::before {
+  /* 收尾 1.5 秒里，这些独立动画都被外层统一动画盖住了，
+     继续推进只是白耗帧时间。一并暂停能让开场明显更顺。 */
   animation-play-state: paused !important;
 }
 
