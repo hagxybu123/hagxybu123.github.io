@@ -22,11 +22,14 @@
     // Canvas 可用：淡出 CSS 静态星点兜底层
     document.documentElement.classList.add('sky-live');
 
+    /* 精灵缓存必须在最前面声明并赋值：palette() 与 auroraSprite() 在文件更早的
+       位置就会被调用，而 var 只提升声明不提升赋值——放后面会静默拿到 undefined。 */
+    var spriteCache = {};
+
     /* ---- 光晕精灵缓存 ----------------------------------------------------
        原来每颗星每帧都调用 createRadialGradient，560 颗星 = 每秒创建几万个
        渐变对象，跑久了渲染管线会卡顿撕裂（表现为闪屏）。
        改为把光晕预渲染成小图，之后只做 drawImage —— 快几十倍。            */
-    var spriteCache = {};
     function glowSprite(rgb, size) {
       var key = rgb + '|' + size;
       var s = spriteCache[key];
@@ -71,6 +74,11 @@
     var clouds = [];
     var sparks = [];
     var rings = [];
+    var trail = [];          // 按住拖动画出的星屑
+    var painting = false;
+    var lastPaint = 0;
+    var aurora = [];         // 极光帘幕
+    var auroraT = 0;
     var w = 0, h = 0, dpr = 1;
     var scrollY = window.scrollY || 0;
     var mx = -9999, my = -9999;
@@ -146,6 +154,25 @@
         });
       }
 
+      // 极光帘幕：几道缓慢横向漂移的竖直柔光，每道独立呼吸
+      aurora = [];
+      var auroraDefs = mobile
+        ? [[0.22, '150, 255, 220'], [0.68, '190, 170, 255']]
+        : [[0.16, '150, 255, 220'], [0.44, '205, 232, 255'], [0.72, '198, 178, 255'], [0.89, '255, 190, 220']];
+      for (var au = 0; au < auroraDefs.length; au++) {
+        aurora.push({
+          x: w * auroraDefs[au][0],
+          rgb: auroraDefs[au][1],
+          wd: rnd(w * 0.16, w * 0.30),
+          ht: rnd(h * 0.52, h * 0.82),
+          baseY: h + rnd(6, 40),
+          vx: rnd(0.045, 0.14) * (Math.random() > 0.5 ? 1 : -1),
+          ph: Math.random() * Math.PI * 2,
+          sp: rnd(0.004, 0.011),
+          a: rnd(0.40, 0.72)
+        });
+      }
+
       // 星云：亮色云团（中心实、边缘透），是"星光感"的主体
       clouds = [
         { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.44, vx: 0.022, vy: 0.011, c: [104, 152, 255], a: 0.92 },
@@ -158,7 +185,40 @@
     function palette(hue) {
       if (hue === 'gold') return '255, 232, 168';
       if (hue === 'ice') return '205, 232, 255';
+      if (hue === 'violet') return '198, 178, 255';
+      if (hue === 'rose') return '255, 190, 220';
       return '255, 255, 255';
+    }
+
+    /* 极光帘幕精灵：竖直方向的柔光条纹，预渲染成图后反复拉伸使用。
+       关键：绝不在帧循环里 createGradient —— 那正是之前闪屏的主因。
+       注意 spriteCache 在本函数之后才被赋值，这里做惰性兜底避免 undefined。 */
+    function auroraSprite(rgb) {
+      if (!spriteCache) spriteCache = {};
+      var key = 'aurora|' + rgb;
+      var s = spriteCache[key];
+      if (s) return s;
+      var c = document.createElement('canvas');
+      c.width = 128; c.height = 256;
+      var g = c.getContext('2d');
+      if (!g) return null;
+      // 竖直渐变：底部亮、向上散开
+      var v = g.createLinearGradient(0, 256, 0, 0);
+      v.addColorStop(0, 'rgba(' + rgb + ', 0.55)');
+      v.addColorStop(0.35, 'rgba(' + rgb + ', 0.28)');
+      v.addColorStop(1, 'rgba(' + rgb + ', 0)');
+      g.fillStyle = v;
+      g.fillRect(0, 0, 128, 256);
+      // 横向柔边：两侧淡出，避免出现直边
+      g.globalCompositeOperation = 'destination-in';
+      var hgr = g.createLinearGradient(0, 0, 128, 0);
+      hgr.addColorStop(0, 'rgba(0,0,0,0)');
+      hgr.addColorStop(0.5, 'rgba(0,0,0,1)');
+      hgr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = hgr;
+      g.fillRect(0, 0, 128, 256);
+      spriteCache[key] = c;
+      return c;
     }
 
     function spawnComet() {
@@ -183,6 +243,17 @@
       // 粒子总量上限：狂点也不至于把渲染拖垮（闪屏的另一诱因）
       if (sparks.length > 420) sparks.splice(0, sparks.length - 420);
       if (rings.length > 24) rings.splice(0, rings.length - 24);
+
+      // 整片星空会"回应"你：随机唤醒几颗远处的星一起亮一下
+      if (stars.length) {
+        var wake = 3 + Math.floor(Math.random() * 4);
+        for (var wk = 0; wk < wake; wk++) {
+          var rs = stars[(Math.random() * stars.length) | 0];
+          if (!rs) continue;
+          rs.echo = 1;
+          rs.echoDecay = rnd(0.012, 0.03);
+        }
+      }
 
       // ① 三道扩散星环，速度与粗细各异，形成冲击波层次
       rings.push({ x: x, y: y, life: 1, r: 0, grow: rnd(4.6, 6.2), decay: rnd(0.016, 0.022), w: 3.2, hue: 'gold' });
@@ -246,6 +317,26 @@
       }
 
       ctx.clearRect(0, 0, w, h);
+
+      // 极光帘幕：最底层，几道慢慢漂移的柔光柱（全部用预渲染精灵，零渐变创建）
+      if (aurora.length) {
+        auroraT += dt;
+        ctx.globalCompositeOperation = 'lighter';
+        for (var ai = 0; ai < aurora.length; ai++) {
+          var ab = aurora[ai];
+          ab.x += ab.vx * dt;
+          ab.ph += ab.sp * dt;
+          if (ab.x < -ab.wd) ab.x = w + ab.wd;
+          if (ab.x > w + ab.wd) ab.x = -ab.wd;
+          var spr = auroraSprite(ab.rgb);
+          if (!spr) continue;
+          var breathe = 0.62 + 0.38 * Math.sin(ab.ph);
+          ctx.globalAlpha = ab.a * breathe * 0.5;
+          ctx.drawImage(spr, ab.x - ab.wd / 2, ab.baseY - ab.ht, ab.wd, ab.ht);
+          ctx.globalAlpha = 1;
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      }
 
       // 星云：亮色云团，中心实、边缘透 —— 这是"星光"的主体
       ctx.globalCompositeOperation = 'source-over';
@@ -348,6 +439,12 @@
         var boost = 0;
         var dxm = st.x - mx, dym = y - my;
         if (dxm * dxm + dym * dym < 19000) boost = 0.5;
+        // 远处星星的"回应"：你点击时被唤醒，然后慢慢暗回去
+        if (st.echo > 0) {
+          st.echo -= (st.echoDecay || 0.02) * dt;
+          if (st.echo < 0) st.echo = 0;
+          boost = Math.max(boost, st.echo * 0.75);
+        }
 
         var alpha = Math.min(1, st.a + boost);
         var col = palette(st.hue);
@@ -486,6 +583,23 @@
         ctx.arc(sp.x, sp.y, 1.9 * sp.life, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // 按住拖动画出的星屑：各自呼吸着淡出
+      if (trail.length) {
+        for (var tr = trail.length - 1; tr >= 0; tr--) {
+          var tp = trail[tr];
+          tp.life -= 0.012 * dt;
+          tp.ph += 0.09 * dt;
+          if (tp.life <= 0) { trail.splice(tr, 1); continue; }
+          var breath = 0.72 + 0.28 * Math.sin(tp.ph);
+          var talpha = tp.life * breath;
+          halo(palette(tp.hue), tp.x, tp.y, tp.r * 7, talpha * 0.6);
+          ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, talpha * 1.3).toFixed(3) + ')';
+          ctx.beginPath();
+          ctx.arc(tp.x, tp.y, tp.r * 0.42 * tp.life + 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       ctx.globalCompositeOperation = 'source-over';
 
       // 彗星节奏：平均 1.6~3.2 秒一颗，约七成概率同时来两颗
@@ -507,7 +621,28 @@
     window.addEventListener('scroll', function () { scrollY = window.scrollY || 0; }, { passive: true });
     window.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; }, { passive: true });
     window.addEventListener('mouseout', function () { mx = -9999; my = -9999; });
-    window.addEventListener('pointerdown', function (e) { addSpark(e.clientX, e.clientY); }, { passive: true });
+    window.addEventListener('pointerdown', function (e) {
+      addSpark(e.clientX, e.clientY);
+      painting = true;
+      lastPaint = 0;
+    }, { passive: true });
+    // 按住拖动：沿轨迹画出一串会呼吸的星屑（彩蛋，也是"这片星空可以摸"的证明）
+    window.addEventListener('pointerup', function () { painting = false; }, { passive: true });
+    window.addEventListener('pointercancel', function () { painting = false; }, { passive: true });
+    window.addEventListener('pointermove', function (e) {
+      if (!painting) return;
+      var now = performance.now();
+      if (now - lastPaint < 26) return;      // 限流：最多约每 26ms 落一颗，防刷爆
+      lastPaint = now;
+      if (trail.length > 150) trail.shift();
+      trail.push({
+        x: e.clientX, y: e.clientY,
+        life: 1,
+        r: rnd(2.2, 5.4),
+        ph: Math.random() * Math.PI * 2,
+        hue: Math.random() > 0.55 ? 'gold' : (Math.random() > 0.4 ? 'ice' : 'violet')
+      });
+    }, { passive: true });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) stop(); else start();
     });
@@ -1186,217 +1321,237 @@
 
     var PICK = function (arr) { return arr[Math.floor(Math.random() * arr.length)]; };
 
-    /* ---- 话题库：keywords 命中越多分越高，回复随机取一条 ---- */
+    /* ---- 话题库：keywords 命中越多分越高，回复随机取一条 ----
+       语气设定：王室少女 · 毒舌傲娇。刀子嘴豆腐心：
+       先损你一句，再悄悄把有用的信息塞给你。损的是"事"，不是人。 */
     var TOPICS = [
       {
         id: 'greet', chips: '你好',
-        keywords: ['你好', '您好', 'hi', 'hello', '在吗', '在么', '嗨', '哈喽'],
+        keywords: ['你好', '您好', 'hi', 'hello', '在吗', '在么', '嗨', '哈喽', 'hey'],
         replies: [
-          '嗯，来了。……别误会，我只是刚好没在忙。',
-          '你来了。星庭今天很安静，正好缺个说话的人。',
-          '哟，稀客。说吧，想聊什么？我可是很挑话题的。'
+          '哟，稀客。……别站着，坐吧，反正这院子也没别人。',
+          '嗯，来了。我本来在忙很重要的事——好吧，我在发呆。',
+          '你终于开口了。站那儿盯了这么久，我还以为你在研究我的像素。'
         ]
       },
       {
         id: 'who', chips: '你是谁',
         keywords: ['你是谁', '你叫什么', '自我介绍', '介绍一下你', '什么角色', '你是'],
         replies: [
-          '天逸。王室的……算了，这个头衔挺沉的。你叫我天逸就好。',
-          '"逸"取的是"逃逸"的意思——从被安排好的剧本里逃出来。听懂了吗？',
-          '名字里的"逸"是逃逸的逸。规矩是死的，人是活的，那么守规矩有意思吗？'
+          '天逸。王室的——算了，这头衔说出来也没人信，你看你这表情。',
+          '"逸"是逃逸的逸。从别人给我写好的剧本里逃出来，听懂了没？',
+          '名字都写在标题上了，你居然还要问。……行吧，我叫天逸，记住了。'
         ]
       },
       {
         id: 'creator', chips: '天逸是谁做的',
-        keywords: ['谁做的', '谁创', '作者', '站长', '本人', '你真的', '谁写', '原型'],
+        keywords: ['谁做的', '谁创', '作者', '站长', '原型', '谁写', '谁做'],
         replies: [
-          '我是他自己写出来的。设定、脾气、连这句嘴硬都是。……有点奇怪吧？我也这么觉得。',
-          '严格说，我是他的一部分。他把不好意思直说的话，都交给我说了。',
-          '是他做的。不过配色是他自己挑的——宝蓝、冰蓝、白蕾丝，全是他喜欢的样子。'
-        ]
-      },
-      {
-        id: 'code', chips: '会写代码吗',
-        keywords: ['代码', '编程', 'python', '写程序', '程序', '会不会写', 'js', '前端'],
-        replies: [
-          '他写，我在旁边看。Python 那个猜数字小游戏，我看了三遍才忍住没吐槽变量名。',
-          '会一点。但说实话，我更擅长挑毛病——比如"你这函数是不是该拆一下"。',
-          '代码这事，他比我认真。他有个习惯：报错了不慌，先弄明白为什么。这点我认。'
+          '他写的。设定、脾气、连这句嘴硬都是他敲进去的。……想笑就笑，我习惯了。',
+          '一个熬夜到天亮、还坚持说"再改一版就好"的人。你说这种人是不是有病？',
+          '他把我造出来，然后指望我替他说那些他不好意思说的话。懦弱，但有效。'
         ]
       },
       {
         id: 'site', chips: '这网站怎么做的',
-        keywords: ['网站', '这个页面', '网页', '站点', '怎么做的', '做的'],
+        keywords: ['网站', '这个页面', '网页', '站点', '怎么做的'],
         replies: [
-          '手写的。HTML、CSS、JavaScript，没有框架，没有模板。他说"得是自己能讲清楚的东西"。',
-          '从头做了一遍。第一版简陋到他不好意思给别人看，于是推翻重来——才有现在的星庭。',
-          '你点一下空白处试试，会炸开星环。这个是他折腾了很久才满意的。'
+          '手写的。HTML、CSS、JavaScript，一个框架都没用。他说"得是自己讲得清楚的东西"。',
+          '第一版丑得他自己都不想看，于是推翻重做。你看到的已经是第 N 版了，别再挑了。',
+          '你点一下页面空白处，会炸开星环。他为了这个效果折腾到凌晨——男人至死是少年。'
         ]
       },
       {
         id: 'stars', chips: '星星是你加的吗',
         keywords: ['星星', '星空', '星环', '流星', '彗星', '点一下'],
         replies: [
-          '嗯。他为了这些星星熬到很晚，还专门修过一次"看起来不动"的毛病。',
-          '星星是真的——背景那张是 NASA 拍的。上面飘的这些才是他画的。',
-          '随手点一下页面，会有星环炸开。他说这是给路过的人准备的小礼物。'
+          '嗯，他加的。星星多到他电脑风扇开始唱歌，他还说"再密一点"。',
+          '背景那张是 NASA 拍的实景。上面飘的这些才是他画的——别看错了。',
+          '那些星星一闪一闪的，他管这叫"呼吸感"。我看叫"显卡在哀嚎"更准确。'
+        ]
+      },
+      {
+        id: 'code', chips: '会写代码吗',
+        keywords: ['代码', '编程', 'python', '写程序', '会不会写', 'js', '前端', 'bug'],
+        replies: [
+          '他写，我在旁边看。变量名起得跟闹着玩似的，我看了三遍才忍住没说话。',
+          '会一点。但我更擅长挑毛病——"你这函数是不是该拆了？"他每次都装没听见。',
+          '他有个怪癖：报错了不慌，先弄明白为什么。这点……勉强算他厉害。'
         ]
       },
       {
         id: 'chess', chips: '你下棋怎么样',
         keywords: ['棋', '象棋', '围棋', '下棋', '棋艺'],
         replies: [
-          '落子前先算后面三步——这是他写在页面上的话，也是他真正在做的事。',
-          '他下棋很稳。输了不急着翻盘，先复盘。这点比大多数人强。',
-          '急的人先输。这句话他吃过亏才写下来的。'
+          '落子前先算三步——他写在页面上的话。可惜生活里他经常只算一步。',
+          '他下棋很稳，输急了也不翻脸，先复盘。这点比他写代码时成熟多了。',
+          '急的人先输。这话是他输了不知道多少盘才憋出来的，血泪教训。'
         ]
       },
       {
         id: 'game', chips: '玩什么游戏',
         keywords: ['游戏', '打游戏', '玩什么', 'steam', '策略'],
         replies: [
-          '策略类。一局能琢磨一晚上，反复想"要是当时换一步会怎样"。',
-          '他玩得很慢，慢到别人都以为他在挂机。其实是在算。',
-          '玩着玩着就开始好奇"这东西怎么做出来的"——后来就有了这一页。'
+          '策略类，一局能琢磨一晚上。别人以为他挂机了，其实他在算。人菜瘾大。',
+          '他玩得很慢。慢到你怀疑他是不是睡着了——然后他突然一步把你将死。',
+          '玩着玩着就开始琢磨"这东西怎么做出来的"。然后就有了这一页。也是没救了。'
         ]
       },
       {
         id: 'dress', chips: '听说你喜欢女装？',
         keywords: ['女装', '裙子', '穿搭', '蕾丝', '版型'],
         replies: [
-          '喜欢。这不是什么需要解释的事——好看的东西不该分性别。',
-          '版型、配色、蕾丝走向，我研究得挺认真。跟他写代码时一个毛病：细节控。',
-          '穿得开心就是最好的理由。你要问"为什么"，那说明你还没想通。'
+          '喜欢。这事不需要解释——觉得需要解释的人，是自己没想通。',
+          '版型、配色、蕾丝走向，他研究得比对代码还认真。你说这算什么优先级？',
+          '穿得开心就是最好的理由。你要是想听个"更深层的原因"，那你要失望了。'
         ]
       },
       {
         id: 'sweet', chips: '你爱吃什么',
         keywords: ['吃', '甜', '桂花糖', '糖', '点心', '零食', '蜜饯'],
         replies: [
-          '桂花糖。……不是我想吃，是路上那摊卖得可怜，顺手买的。',
-          '点心。宫里那套规矩太多，摆得再好看也没味道。',
-          '有人问我兜里为什么总揣着糖——我是怕小商贩亏本，懂了没？'
+          '桂花糖。……不是我想吃，是那摊小贩看着可怜。别用那种眼神看我。',
+          '点心。宫里摆的那些规矩太多，好看是好看，一点味道都没有。',
+          '我兜里常年揣着糖。你要问为什么——我乐意，不行吗？'
         ]
       },
       {
         id: 'anime', chips: '洛天依',
         keywords: ['洛天依', '二次元', '动漫', '番', '天依'],
         replies: [
-          '洛天依。这一页的宝蓝和冰蓝就是从她那里来的。',
-          '他写了很多遍她的设定，最后把那份审美搬进了这个页面。',
-          '蓝白配色，星空背景——你以为这些是随便挑的？'
+          '洛天依。这一页的宝蓝和冰蓝就是从她那儿偷来的配色——他说是"致敬"。',
+          '他写过很多遍她的设定。写着写着就把审美搬进了这个页面，还觉得自己很隐蔽。',
+          '蓝白配色配星空——你以为是随便挑的？天真。'
         ]
       },
       {
         id: 'music', chips: '背景音乐是什么',
         keywords: ['音乐', '歌', 'bgm', '守护', '奥特曼', '听歌'],
         replies: [
-          '《只想守护你》。点右上角那个唱片图标就能听。',
-          '歌是"只想守护你 ～理纱之歌～"。他挑了很久才定下来。',
-          '有音乐的时候，这片星空会更像真的。你自己听听看。'
+          '《只想守护你》。点右上角那个唱片图标——别告诉我你连按钮都找不到。',
+          '歌是"只想守护你 ～理纱之歌～"。他挑了很久，久到我以为他在写论文。',
+          '有音乐的时候这片星空才像真的。不信你把声音关了点一下星星，差远了。'
         ]
       },
       {
         id: 'school', chips: '你在哪上学',
         keywords: ['学校', '大学', '专业', '沈阳', '丹东', '在哪', '哪里人'],
         replies: [
-          '沈阳理工大学，计算机科学与技术。丹东东港人。',
-          '在沈阳读书，学计算机。你要是也在东北，冬天就知道什么叫"不想出门"。',
-          '坐标辽宁丹东东港。海风很咸，星空倒是很干净。'
+          '沈阳理工大学，计算机科学与技术。丹东东港人。要查户口吗？',
+          '在沈阳读书。东北的冬天你体会过就知道，能不出门就是胜利。',
+          '辽宁丹东东港。海风很咸，星空倒是干净——比城里的强多了。'
         ]
       },
       {
         id: 'contact', chips: '怎么联系他',
         keywords: ['联系', '邮箱', 'qq', '微信', '找你', '怎么找'],
         replies: [
-          '邮箱 747693891@qq.com。他有空都会看。',
-          '"找到我"那一栏里都写着。留言板也行，他认真看的。',
-          'GitHub 是 hagxybu123。偷偷说一句，他挺希望有人来留言的。'
+          '747693891@qq.com。他会看的——虽然回得慢，慢到你怀疑他掉线了。',
+          '"找到我"那一栏写着呢，眼睛是装饰品吗？留言板也行，他真会看。',
+          'GitHub 是 hagxybu123。偷偷说：他挺希望有人来留句话的，别让他失望。'
         ]
       },
       {
         id: 'hobby', chips: '他有什么爱好',
         keywords: ['爱好', '兴趣', '喜欢做什么', '平时', '嗜好'],
         replies: [
-          '棋艺、二次元、折腾电脑、女装、打游戏。五个爱好，全写在"关于我"里了。',
-          '下棋和写代码是同一件事——先想清楚，再动手。',
-          '爱好挺杂的。但共同点很明显：都要求他认真对待细节。'
+          '棋艺、二次元、折腾电脑、女装、打游戏。五样，写在"关于我"里，自己看。',
+          '下棋和写代码在他眼里是一回事——先想清楚，再动手。可惜他经常想太久。',
+          '爱好挺杂。共同点是都很费时间，且都不赚钱。'
         ]
       },
       {
         id: 'feel', chips: '你心情怎么样',
         keywords: ['心情', '开心吗', '难过', '累', '烦', '郁闷', '压力'],
         replies: [
-          '……还好。你要是也不太顺，那就先坐一会儿，星庭不收门票。',
-          '累了就歇着。他熬夜写这一页的时候，我也这么劝过他，他不听。',
-          '别硬撑着。规矩都能变通，情绪更不用憋着。'
+          '……还行。你要是不太顺，就坐会儿，星庭不收门票也不问理由。',
+          '累了就歇着。他熬到天亮写这页的时候我也劝过，他不听。你们一个样。',
+          '别硬撑。规矩都能变通，情绪更不用憋着——这话我说的，记着。'
         ]
       },
       {
         id: 'thanks', chips: '谢谢你',
         keywords: ['谢谢', '感谢', '多谢', 'thank'],
         replies: [
-          '……不用谢。别用那种眼神看我，我只是顺手。',
-          '嗯。你能来，他应该会高兴——我才没有替他高兴。',
-          '客气什么。星庭的门一直开着，想来随时来。'
+          '……谢什么。我只是顺手，别自作多情。',
+          '嗯。你能来他大概会高兴——我才没有替他高兴，别瞎猜。',
+          '客气话就免了。下次记得回来，比说谢谢有用。'
         ]
       },
       {
         id: 'bye', chips: '我先走了',
         keywords: ['再见', '拜拜', '走了', '下线', '晚安', 'bye'],
         replies: [
-          '走吧。……下次记得回来。',
-          '晚安。星光不息，代码不止。',
-          '行。我不送你了——反正我也出不去。'
+          '走吧。……门在那儿，不用我指。',
+          '晚安。星光不息，代码不止——这话好听吧，我编的。',
+          '行，不送。反正我也出不去，只能目送，挺惨的。'
         ]
       },
       {
         id: 'praise', chips: '这页面真好看',
         keywords: ['好看', '漂亮', '厉害', '牛', '强', '喜欢这个', '不错', '惊艳'],
         replies: [
-          '……哼。他改了很多版才到这一步，别夸得太轻巧。',
-          '这话他听了会装作不在意，然后偷偷记下来。',
-          '眼光不错。不过星星那部分还能更好，他还在调。'
+          '……哼。他改了不知道多少版才这样，你一句话就想夸完？',
+          '这话他听了会装作不在意，然后半夜偷偷再看一遍。我太了解他了。',
+          '眼光还行。不过星星那块还能更好，他还在调——别夸太早。'
         ]
       },
       {
         id: 'critic', chips: '有点丑',
         keywords: ['丑', '难看', '不行', '烂', '差', '垃圾'],
         replies: [
-          '……说吧，哪里不好。他让我记着，改就是了。',
-          '审美这东西各有各的。但你得说具体点，不然改不了。',
-          '第一版更难看。真的。'
+          '……说吧，哪儿不好。他让我记着，我记性比他好。',
+          '审美各花入各眼。但你得说具体点，光说"丑"我也没法转达。',
+          '第一版比这难看十倍。真的。你现在看到的已经是审美进步的结果了。'
         ]
       },
       {
         id: 'meaning', chips: '什么是星庭',
         keywords: ['星庭', '什么意思', '含义', '为什么叫'],
         replies: [
-          '星庭是我住的地方。他给我造了一座，顺便留了门给路过的人。',
-          '星是星空，庭是庭院。一个人的院子，开着门。',
-          '他名字里有个"逸"，想逃出去；可又造了个庭院，等人进来。矛盾吧？'
+          '我住的地方。他造了一座，顺手给路过的人留了个门——多此一举，但还行。',
+          '星是星空，庭是庭院。一个人的院子，门开着。听着挺矫情，做出来倒不赖。',
+          '他名字里有个"逸"，想逃出去；又造了座庭院，等人进来。矛盾得很有水平。'
         ]
       },
       {
         id: 'ai', chips: '你是真的 AI 吗',
         keywords: ['你是ai', '真的ai', '是不是ai', '人工智能', '大模型', '语言模型', 'chatgpt', 'deepseek', '智能', '模型', '机器人'],
         replies: [
-          '不是。我是他写的一段对话表——性格是真的，脑子是预置的。',
-          '说实话：我是个本地角色，不会真的思考。但他把我的脾气写得很像样。',
-          '静态页面放不下真模型（Key 会被人偷走）。所以你看到的，是他手写的我。'
+          '不是。我是一张对话表，性格是真的，脑子是预置的。失望了？',
+          '说实话：我不会思考，只是被写得很像。但他把脾气写对了，这就够了。',
+          '静态页面养不起真模型——Key 放前端等于把家门钥匙插在锁上。所以，你看到的是他手写的我。'
+        ]
+      },
+      {
+        id: 'roast', chips: '你能损我一句吗',
+        keywords: ['损我', '骂我', '毒舌', '吐槽我', '喷我'],
+        replies: [
+          '可以，但你会后悔。……算了，看你这么诚恳，就免了。',
+          '你专门来让人骂？这爱好比我认识的所有人都奇特。',
+          '我只损事不损人。你暂时还没做出什么值得我开口的事——继续保持。'
+        ]
+      },
+      {
+        id: 'secret', chips: '有什么秘密',
+        keywords: ['秘密', '彩蛋', '藏了', '隐藏', '好玩'],
+        replies: [
+          '页面空白处点一下，会炸开星环。他以为没人会发现——你也别告诉他是我说的。',
+          '他在页脚藏了话。自己找，我不当导游。',
+          '你按住鼠标在星空中拖一下试试。别说是我让你试的。'
         ]
       }
-    ];
+    ];;
 
-    /* ---- 性格碎片：没命中话题时用 ---- */
+    /* ---- 性格碎片：没命中话题时用（保持毒舌，但损的是事不是人）---- */
     var FALLBACK = [
-      '嗯……这个我答不上来。换个说法？',
-      '你说的话我记下了。不过这个话题，他可能比我更懂。',
-      '唔。要不你点一下页面空白处，看星星炸开的样子？',
-      '我听不太懂，但我不装懂——这点比他强。',
-      '……你去"关于我"那一栏翻翻？说不定有答案。'
+      '……这问题超纲了。换个说法，或者换个人问。',
+      '我记下了，但我不打算假装听懂——这一点比他诚实。',
+      '唔。要不你去点一下页面空白处，看星星炸开？比这个话题有意思。',
+      '你确定这是在跟我说话？我只是一张对话表，别为难我。',
+      '答不上来。承认这件事，比现编一个体面多了。'
     ];
-    var PROMPTS = ['那你呢？', '……继续。', '说吧，我在听。'];
+    var PROMPTS = ['……然后呢？', '就这？', '继续，我听着。'];
 
     var greeted = false;
     var history = {};
@@ -1482,7 +1637,7 @@
       launcher.setAttribute('aria-expanded', 'true');
       if (!greeted) {
         greeted = true;
-        typingThen('……你来了。星庭今天没什么人，随便看看吧。<br>想问我什么就问，我不一定答，答了就一定是真的。', 700);
+        typingThen('……你来了。星庭今天没什么人，随便看看吧。<br>想问我什么就问，我不一定答，答了就一定是真的。<br><span style="opacity:.62">（小提示：按住鼠标在星空里拖一下，星星会跟着你走。别谢我。）</span>', 700);
       }
       window.setTimeout(function () { try { input.focus(); } catch (e) {} }, 120);
     }
