@@ -1480,44 +1480,29 @@
      版本、动画开关、CSS 隐藏都已排除，无法进一步定位，
      因此不再依赖 canvas —— 只要浏览器能渲染 CSS，效果就一定存在。
      闪烁由 CSS keyframes 驱动，JS 只负责建一次元素。 */
-  /* 生成一层静态星空贴图，返回 data URL。
-     思路：把几十颗星画进一张小画布（只画一次），交给 CSS 作为
-     background-image 平铺。这样浏览器只需维护 3 个元素、3 条动画，
-     而不是几十个元素各自一条 —— 这正是主页闪烁的来源。
-     注意：这里用 canvas 只是"一次性生成贴图"，即使该内核的动态 canvas
-     绘制有问题，静态贴图通常也能正常生成；万一失败会退回逐元素方案。 */
-  function starTile(w, h, n, palettes, maxR) {
-    try {
-      var c = document.createElement('canvas');
-      c.width = w;
-      c.height = h;
-      var g = c.getContext('2d');
-      if (!g) return null;
-      for (var i = 0; i < n; i++) {
-        var col = palettes[(Math.random() * palettes.length) | 0];
-        var r = rnd(0.5, maxR);
-        var x = rnd(0, w);
-        var y = rnd(0, h);
-        // 光晕：小范围径向渐变，仅在生成贴图时创建一次
-        var rg = g.createRadialGradient(x, y, 0, x, y, r * 3.2);
-        rg.addColorStop(0, 'rgba(' + col + ', ' + rnd(0.55, 0.95).toFixed(2) + ')');
-        rg.addColorStop(1, 'rgba(' + col + ', 0)');
-        g.fillStyle = rg;
-        g.beginPath();
-        g.arc(x, y, r * 3.2, 0, Math.PI * 2);
-        g.fill();
-        // 白芯
-        g.fillStyle = 'rgba(255,255,255,' + rnd(0.6, 1).toFixed(2) + ')';
-        g.beginPath();
-        g.arc(x, y, r * 0.6, 0, Math.PI * 2);
-        g.fill();
-      }
-      var url = c.toDataURL('image/png');
-      // 极小的 data URL 说明是空图，视为失败
-      return url && url.length > 400 ? url : null;
-    } catch (e) {
-      return null;
+  /* 生成一层星野的 CSS background 值 —— 【完全不用 canvas】。
+     一颗星就是一个 radial-gradient：
+       中心 0~40% 实心，到 100% 渐隐为透明，形成柔和的圆点。
+     把这些星点用逗号串起来交给 background-image，再用 background-size
+     平铺，就得到一层星野。
+     为什么不用 canvas：用户设备的画布探针四项全 0
+     （fillRect / arc / 径向渐变 / drawImage 全部无效），
+     canvas 在该内核上根本不可用。CSS 渐变与 canvas 无关，所以可靠。 */
+  function cssStarLayer(size, n, palettes, maxR, alphaMin, alphaMax) {
+    var parts = [];
+    for (var i = 0; i < n; i++) {
+      var col = palettes[(Math.random() * palettes.length) | 0];
+      var x = rnd(0, size).toFixed(1);
+      var y = rnd(0, size).toFixed(1);
+      var r = rnd(0.6, maxR).toFixed(2);
+      var a = rnd(alphaMin, alphaMax).toFixed(2);
+      // 半径写进色标：0~40% 是实心，之后渐隐
+      parts.push('radial-gradient(' + r + 'px ' + r + 'px at ' + x + 'px ' + y + 'px, ' +
+        'rgba(' + col + ', ' + a + ') 0%, ' +
+        'rgba(' + col + ', ' + a + ') 40%, ' +
+        'rgba(' + col + ', 0) 100%)');
     }
+    return parts.join(',');
   }
 
   function initCssSky() {
@@ -1525,62 +1510,52 @@
     var ringLayer = $('#cssRings');
     if (!layer) return;
 
-    /* 把星空做成 3 层"平铺贴图"，每层各一条动画。
-       为什么换实现：原来是 65 个 <i> 元素各自一条闪烁动画，
-       在 QQ 的 X5 内核上会持续闪烁（用户实测"主页一直闪"）。
-       现在只有 3 个元素、3 条动画，动画数从 65 降到 3 —— 观感密度不减反增
-       （每层贴图里有几十颗星），但浏览器的负担下降一个数量级。 */
+    /* 纯 CSS 星野：3 层静态星点 + 少量闪烁元素。
+       演进过程（都记录在此，避免以后重犯）：
+         第 1 版：65 个 <i> 元素各自一条闪烁动画   -> X5 上持续闪
+         第 2 版：canvas 生成贴图 + 3 层动画        -> 贴图生成失败，
+                  退回 55 个元素，反而闪得更厉害
+         第 3 版（当前）：radial-gradient 画星点，不碰 canvas；
+                  星空【完全静态】不做动画，只给 6 颗亮星做闪烁。
+       静态的东西不可能闪 —— 这是最可靠的解法。 */
     var narrow = window.innerWidth < 760;
-    var tileSize = narrow ? 320 : 420;
+    var size = narrow ? 300 : 400;
+
     var LAYERS = [
-      { n: narrow ? 46 : 78, maxR: 1.5, cols: ['255, 255, 255', '205, 232, 255', '255, 232, 168'],
-        dur: '5.2s', op: 0.85 },
-      { n: narrow ? 30 : 54, maxR: 1.1, cols: ['255, 255, 255', '190, 220, 255'],
-        dur: '7.6s', op: 0.62 },
-      { n: narrow ? 16 : 30, maxR: 2.2, cols: ['255, 232, 168', '255, 255, 255', '210, 235, 255'],
-        dur: '3.8s', op: 1 }
+      { n: narrow ? 40 : 70, maxR: 1.4, aMin: 0.45, aMax: 0.85,
+        cols: ['255, 255, 255', '205, 232, 255', '255, 232, 168'], op: 0.9 },
+      { n: narrow ? 26 : 46, maxR: 1.0, aMin: 0.3, aMax: 0.6,
+        cols: ['255, 255, 255', '190, 220, 255'], op: 0.7 },
+      { n: narrow ? 14 : 26, maxR: 2.0, aMin: 0.6, aMax: 1,
+        cols: ['255, 232, 168', '255, 255, 255', '210, 235, 255'], op: 1 }
     ];
 
-    var built = 0;
     for (var li = 0; li < LAYERS.length; li++) {
       var L = LAYERS[li];
-      var url = starTile(tileSize, tileSize, L.n, L.cols, L.maxR);
-      if (!url) continue;
       var d = document.createElement('div');
       d.className = 'star-layer';
-      d.style.backgroundImage = 'url(' + url + ')';
-      d.style.backgroundSize = tileSize + 'px ' + tileSize + 'px';
-      d.style.animationDuration = L.dur;
+      d.style.backgroundImage = cssStarLayer(size, L.n, L.cols, L.maxR, L.aMin, L.aMax);
+      d.style.backgroundSize = size + 'px ' + size + 'px';
       d.style.opacity = L.op;
-      // 三层错开位置，避免完全重合
-      d.style.backgroundPosition = (li * 97) + 'px ' + (li * 61) + 'px';
+      // 三层错开位置，避免星点完全重合
+      d.style.backgroundPosition = (li * 83) + 'px ' + (li * 57) + 'px';
       layer.appendChild(d);
-      built++;
     }
 
-    /* 贴图生成失败时（该内核的 canvas 连静态绘制都不可用），
-       退回逐元素方案 —— 会闪但至少有星星。 */
-    if (!built) {
-      var count = narrow ? 55 : 120;
-      for (var i = 0; i < count; i++) {
-        var st = document.createElement('i');
-        var roll = Math.random();
-        var size = roll > 0.93 ? rnd(2.6, 3.8) : (roll > 0.62 ? rnd(1.7, 2.5) : rnd(0.9, 1.6));
-        st.style.left = rnd(-1, 100).toFixed(2) + '%';
-        st.style.top = rnd(-1, 100).toFixed(2) + '%';
-        st.style.width = size.toFixed(1) + 'px';
-        st.style.height = size.toFixed(1) + 'px';
-        st.style.animationDuration = rnd(2.2, 7.4).toFixed(2) + 's';
-        st.style.animationDelay = (-rnd(0, 7)).toFixed(2) + 's';
-        var hue = roll > 0.86 ? '255, 232, 168' : (roll > 0.56 ? '205, 232, 255' : '255, 255, 255');
-        st.style.color = 'rgb(' + hue + ')';
-        st.style.background = 'rgb(' + hue + ')';
-        if (roll > 0.95) st.className = 'flare big';
-        else if (roll > 0.88) st.className = 'big';
-        layer.appendChild(st);
-      }
-      layer.setAttribute('data-fallback', 'per-element');
+    /* 只有这 6 颗星参与闪烁 —— 数量个位数，且只动 opacity。
+       这一层是"星空看起来活着"的全部成本。 */
+    var twinkle = narrow ? 4 : 6;
+    for (var ti = 0; ti < twinkle; ti++) {
+      var t = document.createElement('i');
+      t.className = 'star-twinkle';
+      t.style.left = rnd(4, 96).toFixed(2) + '%';
+      t.style.top = rnd(4, 96).toFixed(2) + '%';
+      t.style.animationDuration = rnd(2.6, 4.6).toFixed(2) + 's';
+      t.style.animationDelay = (-rnd(0, 4)).toFixed(2) + 's';
+      t.style.width = t.style.height = rnd(2.4, 3.8).toFixed(1) + 'px';
+      layer.appendChild(t);
     }
+    layer.setAttribute('data-stars', 'css-static+' + twinkle + 'twinkle');
 
     /* DOM 版星环：对象池复用 + 只做 transform 缩放。
        优化点：

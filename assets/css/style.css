@@ -2266,16 +2266,37 @@ html:not(.use-css-stars) .css-stars * {
   position: absolute;
   inset: -40px;                 /* 外扩，避免平铺边缘出现接缝 */
   background-repeat: repeat;
-  /* 只动 opacity：合成线程即可完成，不重排不重绘，
-     这是所有 CSS 动画里最便宜的一类。 */
-  animation: star-layer-twinkle linear infinite;
+  /* 这一层【完全静态】，不做任何动画。
+     原因：用户设备的画布探针四项全 0（fillRect / arc / 渐变 / drawImage 全部无效），
+     说明该内核连最基础的 canvas 绘制都不可用。此前用 canvas 生成星空贴图，
+     生成失败后退回 55 个逐元素动画，反而让主页闪得更厉害。
+     静态背景永远不会闪 —— 闪烁交给下面数量极少的 .tw 元素。 */
 }
 
-@keyframes star-layer-twinkle {
-  0%, 100% { opacity: .45; }
+/* 只有极少数几颗"亮星"参与闪烁。
+   数量控制在个位数，且只动 opacity（合成线程即可完成）。 */
+.star-twinkle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #fff;
+  animation: star-twinkle 3.4s ease-in-out infinite;
+}
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: .25; }
   50%      { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .star-layer { animation: none; opacity: .8 !important; }
+  .star-twinkle { animation: none; opacity: .85; }
 }
+
+
+/* ==================================================================
+   纯 CSS 星点：用 radial-gradient 画一颗星，再靠 background-repeat 平铺。
+   完全不用 canvas —— 这是为了适配"canvas 完全不可用"的内核。
+   一颗星点 = 一个 radial-gradient：
+     中心 0~45% 是实心色，到 100% 渐隐为透明，形成柔和的星点。
+   ================================================================== */
