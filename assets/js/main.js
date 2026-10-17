@@ -1022,8 +1022,8 @@
     var STORE = 'tianyi-bgm';
     var broken = false;
 
-    var TRACK = '只想守护你';
-    var TRACK_SUB = '高见泽俊彦';
+    var TRACK = '只想守护你 ～理纱之歌～';
+    var TRACK_SUB = '日本群星';
 
     function paint(playing) {
       if (btn) {
