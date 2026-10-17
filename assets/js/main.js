@@ -22,7 +22,7 @@
     skyNotes.push(msg);
     try {
       var st = document.getElementById('buildStamp');
-      if (st) st.textContent = 'v6 · 2026-10-16 · ⚠ ' + msg;
+      if (st) st.textContent = 'v7 · 2026-10-16 · ⚠ ' + msg;
     } catch (e) {}
   }
 
@@ -1433,10 +1433,10 @@
       if (cv) cv.style.display = 'none';
       var note = '已切换到 CSS 星层（' + reason + '）';
       var stamp = $('#buildStamp');
-      if (stamp) stamp.textContent = 'v6 · 2026-10-16 · ' + note;
+      if (stamp) stamp.textContent = 'v7 · 2026-10-16 · ' + note;
       var tag = document.querySelector ? document.querySelector('.build-tag') : null;
-      if (tag) tag.textContent = 'v6 · 2026-10-16 · ' + note;
-      document.title = '天逸 · 星庭 [v6] · ' + note;
+      if (tag) tag.textContent = 'v7 · 2026-10-16 · ' + note;
+      document.title = '天逸 · 星庭 [v7] · ' + note;
       if (window.console && console.info) console.info('[星庭] ' + note);
     } catch (e) {}
   }
@@ -1465,6 +1465,18 @@
     var phase = 'idle';   // idle | converge | hold | explode
     var phaseAt = 0;
 
+    /* ------------------------------------------------------------------
+       双缓冲：在离屏画布上把整帧画完，再一次性贴到可见画布。
+       为什么需要它：vdraw 每帧先 clearRect 清空整屏、再逐粒重画（最多 420 个
+       粒子，每个都有描边与渐变）。只要某一帧耗时超过一个刷新周期，浏览器就会
+       把"已清空但没画完"的中间状态显示出来 —— 用户看到的就是闪。
+       离屏合成后，可见画布只在最后被整体覆盖一次，中间状态永远不会暴露。
+       ------------------------------------------------------------------ */
+    var voff = null, voffctx = null;
+    // 帧率上限：漩涡期间每帧绘制量较大，稳在 50fps 比偶尔冲到 60 再掉到 30 更顺
+    var V_FLOOR = 19;
+    var vlast = 0;
+
     function vresize() {
       if (!vortex) return;
       var d = Math.min(window.devicePixelRatio || 1, 2);
@@ -1473,6 +1485,17 @@
       vortex.width = Math.floor(vw * d);
       vortex.height = Math.floor(vh * d);
       vctx.setTransform(d, 0, 0, d, 0, 0);
+
+      // 离屏画布与可见画布同尺寸
+      if (!voff) {
+        voff = document.createElement('canvas');
+        voffctx = voff.getContext('2d');
+      }
+      if (voff) {
+        voff.width = vortex.width;
+        voff.height = vortex.height;
+        if (voffctx) voffctx.setTransform(d, 0, 0, d, 0, 0);
+      }
     }
 
     function palette2(h) {
@@ -1509,7 +1532,10 @@
     }
 
     function vdraw(now) {
-      vctx.clearRect(0, 0, vw, vh);
+      // 全部绘制到离屏画布；可见画布只在最后被整体覆盖一次（见函数末尾）
+      var g = (voffctx || vctx);
+      g.setTransform(Math.min(window.devicePixelRatio || 1, 2), 0, 0, Math.min(window.devicePixelRatio || 1, 2), 0, 0);
+      g.clearRect(0, 0, vw, vh);
       var cx = vw / 2, cy = vh / 2;
 
       // 汇聚时给中心加一个逐渐增强的引力光核
@@ -1517,14 +1543,14 @@
         var el = now - phaseAt;
         var core = phase === 'hold' ? 1 : Math.min(1, el / 620);
         var cr = 26 + core * 92;
-        var cg = vctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+        var cg = g.createRadialGradient(cx, cy, 0, cx, cy, cr);
         cg.addColorStop(0, 'rgba(255, 255, 255, ' + (0.92 * core).toFixed(3) + ')');
         cg.addColorStop(0.4, 'rgba(190, 220, 255, ' + (0.42 * core).toFixed(3) + ')');
         cg.addColorStop(1, 'rgba(140, 180, 255, 0)');
-        vctx.fillStyle = cg;
-        vctx.beginPath();
-        vctx.arc(cx, cy, cr, 0, Math.PI * 2);
-        vctx.fill();
+        g.fillStyle = cg;
+        g.beginPath();
+        g.arc(cx, cy, cr, 0, Math.PI * 2);
+        g.fill();
       }
 
       // 炸开时的冲击光环
@@ -1532,18 +1558,18 @@
         var e2 = now - phaseAt;
         if (e2 < 900) {
           var ring = e2 * 1.9;
-          vctx.strokeStyle = 'rgba(255, 240, 210, ' + Math.max(0, 0.75 * (1 - e2 / 900)).toFixed(3) + ')';
-          vctx.lineWidth = Math.max(1, 16 * (1 - e2 / 900));
-          vctx.beginPath();
-          vctx.arc(cx, cy, ring, 0, Math.PI * 2);
-          vctx.stroke();
-          var fg = vctx.createRadialGradient(cx, cy, 0, cx, cy, 60 + e2 * 2.4);
+          g.strokeStyle = 'rgba(255, 240, 210, ' + Math.max(0, 0.75 * (1 - e2 / 900)).toFixed(3) + ')';
+          g.lineWidth = Math.max(1, 16 * (1 - e2 / 900));
+          g.beginPath();
+          g.arc(cx, cy, ring, 0, Math.PI * 2);
+          g.stroke();
+          var fg = g.createRadialGradient(cx, cy, 0, cx, cy, 60 + e2 * 2.4);
           fg.addColorStop(0, 'rgba(255, 255, 255, ' + Math.max(0, 0.6 * (1 - e2 / 700)).toFixed(3) + ')');
           fg.addColorStop(1, 'rgba(255, 255, 255, 0)');
-          vctx.fillStyle = fg;
-          vctx.beginPath();
-          vctx.arc(cx, cy, 60 + e2 * 2.4, 0, Math.PI * 2);
-          vctx.fill();
+          g.fillStyle = fg;
+          g.beginPath();
+          g.arc(cx, cy, 60 + e2 * 2.4, 0, Math.PI * 2);
+          g.fill();
         }
       }
 
@@ -1553,34 +1579,50 @@
         if (p.life <= 0) continue;
         // 拖尾：从上一帧位置画一条渐隐线，运动感更强
         if (phase === 'explode') {
-          vctx.strokeStyle = 'rgba(' + col + ', ' + (p.life * 0.5).toFixed(3) + ')';
-          vctx.lineWidth = p.r * 0.9;
-          vctx.beginPath();
-          vctx.moveTo(p.px, p.py);
-          vctx.lineTo(p.x, p.y);
-          vctx.stroke();
+          g.strokeStyle = 'rgba(' + col + ', ' + (p.life * 0.5).toFixed(3) + ')';
+          g.lineWidth = p.r * 0.9;
+          g.beginPath();
+          g.moveTo(p.px, p.py);
+          g.lineTo(p.x, p.y);
+          g.stroke();
         }
         // 每颗星带光晕，汇聚时才像"星光流"
         var gr = p.r * (phase === 'explode' ? 5 : 3.4);
-        var g2 = vctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
+        var g2 = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, gr);
         g2.addColorStop(0, 'rgba(' + col + ', ' + (p.life * 0.6).toFixed(3) + ')');
         g2.addColorStop(1, 'rgba(' + col + ', 0)');
-        vctx.fillStyle = g2;
-        vctx.beginPath();
-        vctx.arc(p.x, p.y, gr, 0, Math.PI * 2);
-        vctx.fill();
+        g.fillStyle = g2;
+        g.beginPath();
+        g.arc(p.x, p.y, gr, 0, Math.PI * 2);
+        g.fill();
 
         // 白芯
-        vctx.fillStyle = 'rgba(255, 255, 255, ' + p.life.toFixed(3) + ')';
-        vctx.beginPath();
-        vctx.arc(p.x, p.y, p.r * 0.7, 0, Math.PI * 2);
-        vctx.fill();
+        g.fillStyle = 'rgba(255, 255, 255, ' + p.life.toFixed(3) + ')';
+        g.beginPath();
+        g.arc(p.x, p.y, p.r * 0.7, 0, Math.PI * 2);
+        g.fill();
+      }
+
+      /* 一次性把离屏结果贴到可见画布 —— 双缓冲的关键一步。
+         可见画布此前从未被清空，所以不存在"半成品被显示"的中间状态。 */
+      if (voffctx && voff) {
+        vctx.setTransform(1, 0, 0, 1, 0, 0);
+        vctx.clearRect(0, 0, vortex.width, vortex.height);
+        vctx.drawImage(voff, 0, 0);
       }
     }
 
     function vframe() {
       var now = Date.now();
       var cx = vw / 2, cy = vh / 2;
+
+      /* 帧率上限：漩涡每帧要画上百个描边与渐变，稳在约 50fps
+         比"偶尔冲到 60 再掉到 25"更顺，也少掉撕裂的机会。 */
+      if (now - vlast < V_FLOOR) {
+        vraf = window.requestAnimationFrame(vframe);
+        return;
+      }
+      vlast = now;
 
       if (phase === 'converge') {
         for (var i = 0; i < parts.length; i++) {
@@ -2210,7 +2252,7 @@
             return;   // 标记与标题已由 enableCssSky 写好
           }
 
-          var parts = ['v6 · 2026-10-16'];
+          var parts = ['v7 · 2026-10-16'];
           if (reduceMotion) parts.push('⚠ 系统开启了"减少动态效果"，动画已停用');
           else parts.push('动画已启动');
           parts.push(chk.note);
@@ -2218,7 +2260,7 @@
           var line = parts.join(' · ');
           if (stamp) stamp.textContent = line;
           if (tag) tag.textContent = line;
-          document.title = '天逸 · 星庭 [v6] · ' + chk.note;
+          document.title = '天逸 · 星庭 [v7] · ' + chk.note;
         } catch (e) {}
       }, 900);
     } catch (e) {}
