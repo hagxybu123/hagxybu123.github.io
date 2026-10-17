@@ -26,25 +26,36 @@
   }
 
   /* 读取画布真实像素，判断星空是否真的画出来了。
-     这是最可靠的判据：CSS 与 DOM 都可能"看起来正常"，但画布可以是全黑的。 */
+     判据说明：不能用"亮像素占比" —— 2px 的星点在 1600x900 画布上占比极低，
+     正常的星空也会被判成"几乎是黑的"（本项目真的误判过一次）。
+     改为看**最亮的那批像素有多亮**：有星星 -> 顶端会明显高亮；
+     全黑画布 -> 最亮的也只有个位数。 */
   function drawSelfCheck() {
-    var res = { stars: 0, sky: false, note: '' };
+    var res = { peak: 0, sky: false, note: '' };
     try {
       if (!skyCtx || !skyCanvas) { res.note = '画布未初始化'; return res; }
       var w = skyCanvas.width, h = skyCanvas.height;
       if (!w || !h) { res.note = '画布尺寸为 0'; return res; }
       var data = skyCtx.getImageData(0, 0, w, h).data;
-      var bright = 0, total = 0;
-      // 抽样：每隔 4 个像素取一个，统计非黑像素比例
-      for (var i = 0; i < data.length; i += 4 * 17) {
+      var hist = new Array(256).fill(0);
+      var total = 0;
+      // 抽样统计亮度直方图
+      for (var i = 0; i < data.length; i += 4 * 7) {
+        var lum = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
+        hist[Math.min(255, Math.round(lum))]++;
         total++;
-        if (data[i] + data[i + 1] + data[i + 2] > 60) bright++;
       }
-      res.stars = total ? Math.round((bright / total) * 1000) / 10 : 0;
-      res.sky = res.stars > 0.3;
-      res.note = res.sky ? '星空已绘制（亮像素 ' + res.stars + '%）' : '画布几乎是黑的';
+      if (!total) { res.note = '画布无像素'; return res; }
+      // 取亮度最高的 1% 像素作为"星点"代表
+      var need = Math.max(1, Math.round(total * 0.01));
+      var acc = 0, cut = 255;
+      for (var v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= need) { cut = v; break; } }
+      res.peak = cut;
+      res.sky = cut >= 90;
+      res.note = res.sky
+        ? '星空已绘制（最亮像素 ' + cut + '/255）'
+        : '画布几乎是黑的（最亮仅 ' + cut + '/255）';
     } catch (e) {
-      // getImageData 可能因跨域绘制被拒；本项目自绘精灵，不应发生
       res.note = '无法读取画布像素：' + (e && e.name ? e.name : '未知');
     }
     return res;
@@ -221,7 +232,7 @@
           ph: Math.random() * Math.PI * 2,
           sp: rnd(0.004, 0.011),
           // 背景压暗后有了空间，极光可以更明显一点（氛围感主力）
-          a: rnd(0.30, 0.52)
+          a: rnd(0.46, 0.78)
         });
       }
 
@@ -241,7 +252,7 @@
           ht: rnd(h * 1.0, h * 1.5),
           ph: Math.random() * Math.PI * 2,
           sp: rnd(0.0025, 0.007),
-          a: rnd(0.08, 0.17)
+          a: rnd(0.14, 0.26)
         });
       }
 
@@ -366,9 +377,9 @@
       }
 
       // ① 三道扩散星环，速度与粗细各异，形成冲击波层次
-      rings.push({ x: x, y: y, life: 1, r: 0, grow: rnd(4.6, 6.2), decay: rnd(0.016, 0.022), w: 3.2, hue: 'gold' });
-      rings.push({ x: x, y: y, life: 1, r: 10, grow: rnd(3.0, 4.0), decay: rnd(0.020, 0.027), w: 2.0, hue: 'ice' });
-      rings.push({ x: x, y: y, life: 1, r: 22, grow: rnd(1.8, 2.6), decay: rnd(0.026, 0.034), w: 1.2, hue: 'white' });
+      rings.push({ x: x, y: y, life: 1, r: 0, grow: rnd(4.6, 6.2), decay: rnd(0.016, 0.022), w: 5.0, hue: 'gold' });
+      rings.push({ x: x, y: y, life: 1, r: 10, grow: rnd(3.0, 4.0), decay: rnd(0.020, 0.027), w: 3.4, hue: 'ice' });
+      rings.push({ x: x, y: y, life: 1, r: 22, grow: rnd(1.8, 2.6), decay: rnd(0.026, 0.034), w: 2.2, hue: 'white' });
 
       // ② 中心闪光
       rings.push({ x: x, y: y, life: 1, r: 0, grow: 0, decay: 0.055, w: 0, hue: 'flash' });
@@ -469,7 +480,7 @@
           var spr = auroraSprite(ab.rgb);
           if (!spr) continue;
           var breathe = 0.62 + 0.38 * Math.sin(ab.ph);
-          ctx.globalAlpha = ab.a * breathe * 0.5;
+          ctx.globalAlpha = ab.a * breathe * 0.78;
           ctx.drawImage(spr, ab.x - ab.wd / 2, ab.baseY - ab.ht, ab.wd, ab.ht);
           ctx.globalAlpha = 1;
         }
@@ -491,9 +502,9 @@
         var g = ctx.createRadialGradient(cl.x, cl.y, 0, cl.x, cl.y, cl.r);
         var cc = cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2];
         // 多层停靠点：中心明亮，中段仍有厚度，边缘才散开
-        g.addColorStop(0, 'rgba(' + cc + ', ' + Math.min(1, cl.a * pulse * 0.21).toFixed(3) + ')');
-        g.addColorStop(0.30, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.18).toFixed(3) + ')');
-        g.addColorStop(0.62, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.07).toFixed(3) + ')');
+        g.addColorStop(0, 'rgba(' + cc + ', ' + Math.min(1, cl.a * pulse * 0.40).toFixed(3) + ')');
+        g.addColorStop(0.30, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.34).toFixed(3) + ')');
+        g.addColorStop(0.62, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.15).toFixed(3) + ')');
         g.addColorStop(1, 'rgba(' + cc + ', 0)');
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -510,7 +521,7 @@
         if (p.y < -12) { p.y = h + 10; p.x = Math.random() * w; }
         if (p.x < -12) p.x = w + 10;
         if (p.x > w + 12) p.x = -10;
-        var da = p.a * (0.55 + 0.45 * Math.sin(p.ph));
+        var da = p.a * (0.7 + 0.5 * Math.sin(p.ph));
         ctx.beginPath();
         ctx.fillStyle = 'rgba(' + palette(p.hue) + ', ' + da.toFixed(3) + ')';
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
@@ -591,8 +602,8 @@
         ctx.globalCompositeOperation = 'lighter';
 
         // ① 外层彩色光晕：改用预渲染精灵（原来每帧新建渐变，是闪屏主因）
-        var glowR = radius * (st.flare ? 9 : 5);
-        halo(col, st.x, y, glowR, alpha * 0.55);
+        var glowR = radius * (st.flare ? 13 : 7);
+        halo(col, st.x, y, glowR, alpha * 1.0);
 
         // ② 十字星芒
         if (st.flare) {
@@ -613,13 +624,13 @@
 
         // ③ 白芯：星星"亮"的关键，彩色外圈 + 纯白内芯
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(255, 255, 255, ' + alpha.toFixed(3) + ')';
-        ctx.arc(st.x, y, radius * 0.62, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, alpha * 1.3).toFixed(3) + ')';
+        ctx.arc(st.x, y, radius * 0.82, 0, Math.PI * 2);
         ctx.fill();
 
         // ④ 再补一层色彩，让色相透出来
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + col + ', ' + (alpha * 0.9).toFixed(3) + ')';
+        ctx.fillStyle = 'rgba(' + col + ', ' + Math.min(1, alpha * 1.1).toFixed(3) + ')';
         ctx.arc(st.x, y, radius, 0, Math.PI * 2);
         ctx.fill();
 
@@ -660,7 +671,7 @@
 
         // 头部光晕：预渲染精灵。大流星更亮更大
         var headR = cm.big ? 46 : 26;
-        halo('255, 255, 255', cm.x, cm.y, headR, Math.min(1, (cm.big ? 1.25 : 1.0) * cm.life));
+        halo('255, 255, 255', cm.x, cm.y, headR, Math.min(1, (cm.big ? 1.5 : 1.25) * cm.life));
         halo(col2, cm.x, cm.y, headR * 0.72, (cm.big ? 0.8 : 0.55) * cm.life);
 
         cm.x += dx * cm.speed * dt;
@@ -686,13 +697,13 @@
         rn.r += rn.grow * dt;
         var rc = rn.hue === 'gold' ? '255, 226, 150' : (rn.hue === 'ice' ? '190, 224, 255' : '255, 255, 255');
         // 环本体
-        ctx.strokeStyle = 'rgba(' + rc + ', ' + Math.min(1, rn.life * 1.15).toFixed(3) + ')';
+        ctx.strokeStyle = 'rgba(' + rc + ', ' + Math.min(1, rn.life * 1.45).toFixed(3) + ')';
         ctx.lineWidth = Math.max(0.6, rn.w * rn.life);
         ctx.beginPath();
         ctx.arc(rn.x, rn.y, rn.r, 0, Math.PI * 2);
         ctx.stroke();
         // 环外一圈柔光，让冲击波有厚度
-        ctx.strokeStyle = 'rgba(' + rc + ', ' + (rn.life * 0.22).toFixed(3) + ')';
+        ctx.strokeStyle = 'rgba(' + rc + ', ' + (rn.life * 0.38).toFixed(3) + ')';
         ctx.lineWidth = Math.max(1, rn.w * rn.life * 4.5);
         ctx.beginPath();
         ctx.arc(rn.x, rn.y, rn.r, 0, Math.PI * 2);
@@ -726,12 +737,12 @@
         ctx.stroke();
         // 先画一圈光晕再画芯，金色才会"炸"出来
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + scol + ', ' + (sp.life * 0.28).toFixed(3) + ')';
+        ctx.fillStyle = 'rgba(' + scol + ', ' + (sp.life * 0.45).toFixed(3) + ')';
         ctx.arc(sp.x, sp.y, 6 * sp.life, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
         ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, sp.life * 1.25).toFixed(3) + ')';
-        ctx.arc(sp.x, sp.y, 1.9 * sp.life, 0, Math.PI * 2);
+        ctx.arc(sp.x, sp.y, 2.6 * sp.life, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -759,14 +770,14 @@
           var dxs = b1.x - a1.x, dys = b1.y - a1.y;
           if (dxs * dxs + dys * dys > 40000) continue;   // 跨度太大（换手/跳点）不连
           // 外层柔光
-          ctx.strokeStyle = 'rgba(' + palette(a1.hue) + ', ' + (la * 0.62).toFixed(3) + ')';
+          ctx.strokeStyle = 'rgba(' + palette(a1.hue) + ', ' + (la * 0.82).toFixed(3) + ')';
           ctx.lineWidth = Math.max(2.4, (7 + a1.r * 3.2) * la);
           ctx.beginPath();
           ctx.moveTo(a1.x, a1.y);
           ctx.lineTo(b1.x, b1.y);
           ctx.stroke();
           // 内层高光：白芯，让光带中间是亮的
-          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (la * 0.72).toFixed(3) + ')';
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (la * 0.95).toFixed(3) + ')';
           ctx.lineWidth = Math.max(1.6, (1.8 + a1.r * 0.8) * la);
           ctx.beginPath();
           ctx.moveTo(a1.x, a1.y);
