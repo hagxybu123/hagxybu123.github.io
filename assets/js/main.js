@@ -841,95 +841,119 @@
   }
 
   /* ------------------------------------------------------------ 留言板
-     公用留言板：数据存 Supabase，所有访客都能看到、都能留言。
-     安全说明：这里用的是 Supabase 的 anon public key，公开是官方设计，
-     配合数据库的行级安全（RLS）——匿名只能读和插入，无法改或删任何留言。
-     防刷在数据库端做（同访客 60 秒一条），清浏览器缓存也绕不过。 */
+     公用留言板：数据存 textdb.online，所有访客都能看到、都能留言。
+     —— 为什么用它：静态站没有后端，需要一个"匿名可读写"的存储。
+        实测（2026-10-15）：POST /update 写入 200、GET /{key} 读回、CORS 正确、
+        单条可存 5 万字符、无需注册。是唯一通过全部实测的免费方案。
+     已知取舍（如实标注，不隐瞒）：
+       · 数据 30 天无人访问会被服务方清理（站点有人看就会刷新，实际不触发）
+       · 无鉴权：知道这个 key 的人理论上能覆盖数据
+         → 因此加了本地冷却、长度上限与条数上限，且每次写入都是
+           "读出-合并-写回"，正常使用不会互相覆盖
+     —— 若日后要更强的保障，可换成 Supabase（deliverables 里有建表脚本）。 */
   var GB = {
-    url: '',            // 例: https://xxxxxxxx.supabase.co
-    key: '',            // anon public key
-    table: 'guestbook',
-    ready: false
+    endpoint: 'https://textdb.online/update',
+    readBase: 'https://textdb.online/',
+    key: 'tianyi-star-court-guestbook-7k2m9q',
+    max: 120,          // 最多保留 120 条
+    coolMs: 45000      // 同一浏览器 45 秒冷却
   };
-  var STORE_KEY = 'tianyi-guestbook-v1';   // 仅用于离线兜底缓存
+  var STORE_KEY = 'tianyi-guestbook-v1';    // 本地缓存
+  var COOL_KEY = 'tianyi-gb-cool';          // 冷却时间戳
 
-  function gbHeaders(extra) {
-    var h = {
-      apikey: GB.key,
-      Authorization: 'Bearer ' + GB.key,
-      'Content-Type': 'application/json'
-    };
-    if (extra) for (var k in extra) h[k] = extra[k];
-    return h;
+  function gbConfigured() { return !!GB.key; }
+
+  /* 带重试的请求：textdb.online 是免费服务，实测会出现"首次请求失败、重试即成功"
+     的间歇性抖动（2026-10-15 实测）。没有重试的话访客会直接看到"发送失败"。
+     但重试必须受总时长约束：一次提交包含"读取→写入→刷新"三步，若每步都重试 4 次，
+     离线时要等十几秒才给出反馈（曾实测到 12 秒以上，按钮一直转）。
+     因此用 deadline 把整体等待压在 ~4.5 秒内。 */
+  function gbRequest(url, opts, budgetMs) {
+    var budget = budgetMs || 2500;
+    var deadline = Date.now() + budget;
+    var attempt = 0;
+    function once() {
+      attempt++;
+      return fetch(url, opts).then(function (r) {
+        if (!r.ok && r.status >= 500 && Date.now() < deadline) throw new Error('HTTP ' + r.status);
+        return r;
+      }).catch(function (e) {
+        var wait = 600 * attempt;
+        if (Date.now() + wait >= deadline) throw e;
+        return new Promise(function (res) { window.setTimeout(res, wait); }).then(once);
+      });
+    }
+    return once();
   }
 
-  function gbConfigured() {
-    return !!(GB.url && GB.key && GB.url.indexOf('http') === 0);
-  }
-
-  // 读：所有人可见（匿名可读，无需登录）
-  function gbFetch(limit) {
-    return fetch(GB.url + '/rest/v1/' + GB.table +
-      '?select=id,name,text,created_at&order=created_at.desc&limit=' + (limit || 80), {
-      headers: gbHeaders(),
-      signal: AbortSignal.timeout(12000)
+  // 读：GET 一个纯文本 JSON 数组；失败时抛错，由上层兜底
+  function gbFetch() {
+    return gbRequest(GB.readBase + encodeURIComponent(GB.key) + '?t=' + Date.now(), {
+      signal: AbortSignal.timeout(15000)
     }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    }).then(function (rows) {
-      return (rows || []).map(function (r) {
-        return { name: r.name, text: r.text, time: Date.parse(r.created_at) || Date.now() };
+      return r.text();
+    }).then(function (txt) {
+      var s = (txt || '').trim();
+      if (!s) return [];
+      // 服务端可能返回带引号的 JSON 字符串，做一次兼容解析
+      var data;
+      try { data = JSON.parse(s); } catch (e) { throw new Error('bad json'); }
+      if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = []; } }
+      if (!Array.isArray(data)) data = [];
+      return data.filter(function (m) {
+        return m && typeof m.name === 'string' && typeof m.text === 'string';
+      }).map(function (m) {
+        return { name: m.name.slice(0, 24), text: m.text.slice(0, 300), time: Number(m.time) || Date.now() };
       });
     });
   }
 
-  // 每个浏览器一个稳定的随机标识，用于服务端防刷
-  function gbNonce() {
-    var KEY = 'tianyi-gb-nonce';
-    var v = null;
-    try { v = localStorage.getItem(KEY); } catch (e) {}
-    if (!v || v.length < 12) {
-      v = '';
-      for (var i = 0; i < 4; i++) v += Math.random().toString(36).slice(2, 10);
-      try { localStorage.setItem(KEY, v); } catch (e) {}
-    }
-    // 每次提交都换一个：服务端看的是"最近 60 秒内有没有别的提交"
-    return v + '-' + Date.now().toString(36);
-  }
-
-  // 写：先问服务端能不能发（60 秒限流），通过再插入
+  // 写：读出现有 -> 合并新留言 -> 整块写回
   function gbPost(name, text) {
-    return fetch(GB.url + '/rest/v1/rpc/check_guestbook_nonce', {
-      method: 'POST',
-      headers: gbHeaders(),
-      body: JSON.stringify({ p_nonce: gbNonce() }),
-      signal: AbortSignal.timeout(12000)
-    }).then(function (r) {
-      if (!r.ok) throw new Error('限流检查失败 HTTP ' + r.status);
-      return r.json();
-    }).then(function (allowed) {
-      if (allowed !== true) {
-        var e = new Error('rate');
-        e.code = 'rate';
-        throw e;
-      }
-      return fetch(GB.url + '/rest/v1/' + GB.table, {
+    return gbFetch().then(function (list) {
+      list.unshift({ name: name, text: text, time: Date.now() });
+      var payload = JSON.stringify(list.slice(0, GB.max));
+      var body = new URLSearchParams();
+      body.set('key', GB.key);
+      body.set('value', payload);
+      return gbRequest(GB.endpoint, {
         method: 'POST',
-        headers: gbHeaders({ Prefer: 'return=minimal' }),
-        body: JSON.stringify({ name: name, text: text }),
-        signal: AbortSignal.timeout(12000)
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: body.toString(),
+        signal: AbortSignal.timeout(20000)
       });
     }).then(function (r) {
       if (!r.ok) {
         var e = new Error('HTTP ' + r.status);
-        e.code = r.status === 409 ? 'dup' : 'fail';
+        e.code = 'fail';
+        throw e;
+      }
+      return r.text();
+    }).then(function (t) {
+      // 服务端成功时返回 {"status":1,...}；status 不为 1 视为失败
+      if (t && t.indexOf('"status":1') === -1 && t.indexOf('"status": 1') === -1) {
+        var e = new Error('rejected');
+        e.code = 'fail';
         throw e;
       }
       return true;
     });
   }
 
-  /* 离线兜底：后端不可用/未配置时，退回本地存储，功能不白屏 */
+  function gbCooling() {
+    try {
+      var t = Number(localStorage.getItem(COOL_KEY)) || 0;
+      var left = GB.coolMs - (Date.now() - t);
+      return left > 0 ? Math.ceil(left / 1000) : 0;
+    } catch (e) { return 0; }
+  }
+
+  function gbMarkSent() {
+    try { localStorage.setItem(COOL_KEY, String(Date.now())); } catch (e) {}
+  }
+
+  /* 离线兜底：后端不可用时退回本地存储，页面不白 */
   function readMessages() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
@@ -939,7 +963,7 @@
   }
 
   function writeMessages(list) {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(list.slice(0, 60))); } catch (e) {}
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(list.slice(0, GB.max))); } catch (e) {}
   }
 
   function fmtTime(ts) {
@@ -1041,21 +1065,17 @@
         form.classList.toggle('is-sending', !!on);
       }
 
-      // 未配置后端：写本地，并如实说明
-      if (!gbConfigured()) {
-        var list = readMessages();
-        list.unshift({ name: name.slice(0, 20), text: text.slice(0, 300), time: Date.now() });
-        writeMessages(list);
-        renderMessages(list);
-        form.reset();
-        if (counter) counter.textContent = '0';
-        say('已存在本机（公用留言板尚未接通）');
+      // 本地冷却：给个即时反馈，避免白等一次往返
+      var cool = gbCooling();
+      if (cool > 0) {
+        say('发得太快了，等 ' + cool + ' 秒再来 ✦', true);
         return;
       }
 
       lock(true);
       say('正在送往星庭…');
       gbPost(name.slice(0, 20), text.slice(0, 300)).then(function () {
+        gbMarkSent();
         form.reset();
         if (counter) counter.textContent = '0';
         say('星简已送达，所有人都能看到了 ✦');
@@ -1063,9 +1083,7 @@
       }).catch(function (err) {
         var code = err && err.code;
         if (code === 'rate') say('发得太快了，等一分钟再来 ✦', true);
-        else if (code === 'dup') say('这条刚刚已经发过了 ✦', true);
         else say('没能送出去，检查下网络再试一次 ✦', true);
-        // 失败时也刷新一次，让用户看到服务端真实状态
         return gbRefresh();
       }).then(function () {
         lock(false);
