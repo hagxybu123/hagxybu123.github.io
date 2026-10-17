@@ -15,6 +15,9 @@
     var canvas = $('#sky');
     if (!canvas || reduceMotion) { if (canvas) canvas.style.display = 'none'; return; }
     var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    // Canvas is alive: fade out the CSS star fallback layer.
+    document.documentElement.classList.add('sky-live');
     var stars = [];
     var shooting = [];
     var w = 0, h = 0, dpr = 1;
@@ -31,15 +34,16 @@
     }
 
     function build() {
-      var count = Math.round(Math.min(190, Math.max(70, (w * h) / 13000)));
+      var count = Math.round(Math.min(210, Math.max(80, (w * h) / 11000)));
       stars = [];
       for (var i = 0; i < count; i++) {
         stars.push({
           x: Math.random() * w,
           y: Math.random() * h * 1.15,
-          r: Math.random() * 1.5 + 0.35,
-          a: Math.random() * 0.55 + 0.25,
-          tw: Math.random() * 0.02 + 0.004,
+          r: Math.random() * 1.6 + 0.4,
+          a: Math.random() * 0.6 + 0.3,
+          // 让闪烁更明显一点，肉眼能看出"活着"
+          tw: Math.random() * 0.030 + 0.010,
           dir: Math.random() > 0.5 ? 1 : -1,
           depth: Math.random() * 0.75 + 0.15,
           hue: Math.random() > 0.82 ? 'gold' : (Math.random() > 0.5 ? 'ice' : 'white')
@@ -100,7 +104,8 @@
         if (m.life <= 0 || m.x > w + 200 || m.y > h + 200) shooting.splice(j, 1);
       }
 
-      if (Math.random() < 0.008) spawnShooting();
+      // 平均 4~8 秒来一颗流星，保证"能看见在动"
+      if (Math.random() < 0.02) spawnShooting();
       window.requestAnimationFrame(frame);
     }
 
@@ -397,16 +402,38 @@
 
   /* --------------------------------------------------------------- 启动 */
   function boot() {
-    var year = $('#year');
-    if (year) year.textContent = String(new Date().getFullYear());
-    initSky();
-    initScrollUI();
-    initMenu();
-    initTheme();
-    initReveal();
-    initTyping();
-    initTilt();
-    initGuestbook();
+    // Mark that JS is alive. CSS only hides [data-reveal] elements under
+    // html.js-ready, so a JS failure can never leave the page looking blank.
+    document.documentElement.classList.add('js-ready');
+
+    var steps = [
+      ['年份', function () { var y = $('#year'); if (y) y.textContent = String(new Date().getFullYear()); }],
+      ['星野', initSky],
+      ['滚动与高亮', initScrollUI],
+      ['移动菜单', initMenu],
+      ['主题切换', initTheme],
+      ['入场动效', initReveal],
+      ['打字机', initTyping],
+      ['立绘倾斜', initTilt],
+      ['留言板', initGuestbook]
+    ];
+
+    for (var i = 0; i < steps.length; i++) {
+      try {
+        steps[i][1]();
+      } catch (e) {
+        // One broken feature must never take down the whole page.
+        if (window.console && console.error) console.error('[星庭] ' + steps[i][0] + ' 初始化失败:', e);
+      }
+    }
+
+    // Anything still hidden after boot gets revealed no matter what.
+    window.setTimeout(function () {
+      $$('[data-reveal]').forEach(function (el) {
+        var r = el.getBoundingClientRect();
+        if (r.top < window.innerHeight && !el.classList.contains('is-in')) el.classList.add('is-in');
+      });
+    }, 1200);
   }
 
   if (document.readyState === 'loading') {
