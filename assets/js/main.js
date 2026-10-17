@@ -1,7 +1,7 @@
 /* ==========================================================================
    天逸 · 星庭  —  main.js
-   原生 JS，无任何依赖。功能：星野 canvas、滚动叙事、主题切换、
-   技能进度、数字滚动、打字机、留言板（localStorage）
+   原生 JS，无任何依赖。功能：星野 canvas（星点/彗星/星尘/鼠标交互）、
+   滚动叙事、主题切换、技能进度、数字滚动、打字机、留言板（localStorage）
    ========================================================================== */
 (function () {
   'use strict';
@@ -13,15 +13,26 @@
   /* ---------------------------------------------------------------- 星野 */
   function initSky() {
     var canvas = $('#sky');
-    if (!canvas || reduceMotion) { if (canvas) canvas.style.display = 'none'; return; }
+    if (!canvas) return;
     var ctx = canvas.getContext('2d');
     if (!ctx) return;
-    // Canvas is alive: fade out the CSS star fallback layer.
+
+    // Canvas 可用：淡出 CSS 静态星点兜底层
     document.documentElement.classList.add('sky-live');
+
     var stars = [];
-    var shooting = [];
+    var dust = [];
+    var comets = [];
+    var clouds = [];
+    var sparks = [];
     var w = 0, h = 0, dpr = 1;
     var scrollY = window.scrollY || 0;
+    var mx = -9999, my = -9999;
+    var last = 0, acc = 0;
+    var cometAt = 0;
+    var frameId = null;
+
+    function rnd(a, b) { return a + Math.random() * (b - a); }
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -34,85 +45,240 @@
     }
 
     function build() {
-      var count = Math.round(Math.min(210, Math.max(80, (w * h) / 11000)));
       stars = [];
+      var count = Math.round(Math.min(240, Math.max(90, (w * h) / 9500)));
       for (var i = 0; i < count; i++) {
+        var roll = Math.random();
         stars.push({
           x: Math.random() * w,
-          y: Math.random() * h * 1.15,
-          r: Math.random() * 1.6 + 0.4,
-          a: Math.random() * 0.6 + 0.3,
-          // 让闪烁更明显一点，肉眼能看出"活着"
-          tw: Math.random() * 0.030 + 0.010,
+          y: Math.random() * h * 1.2,
+          r: rnd(0.4, 2.1),
+          a: rnd(0.3, 0.92),
+          tw: rnd(0.010, 0.038),
           dir: Math.random() > 0.5 ? 1 : -1,
-          depth: Math.random() * 0.75 + 0.15,
-          hue: Math.random() > 0.82 ? 'gold' : (Math.random() > 0.5 ? 'ice' : 'white')
+          depth: rnd(0.15, 0.9),
+          hue: roll > 0.90 ? 'gold' : (roll > 0.55 ? 'ice' : 'white'),
+          flare: Math.random() > 0.94
         });
       }
+
+      dust = [];
+      var dCount = Math.round(Math.min(150, Math.max(50, (w * h) / 15000)));
+      for (var d = 0; d < dCount; d++) {
+        dust.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: rnd(1.4, 3.4),
+          vx: rnd(-0.14, 0.14),
+          vy: rnd(-0.28, -0.05),
+          a: rnd(0.10, 0.36),
+          hue: Math.random() > 0.6 ? 'ice' : 'white',
+          ph: Math.random() * 6.28
+        });
+      }
+
+      clouds = [
+        { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.42, vx: 0.018, vy: 0.009, c: [96, 140, 255], a: 0.100 },
+        { x: w * 0.82, y: h * 0.18, r: Math.max(w, h) * 0.38, vx: -0.013, vy: 0.011, c: [170, 120, 235], a: 0.085 },
+        { x: w * 0.55, y: h * 0.72, r: Math.max(w, h) * 0.46, vx: 0.009, vy: -0.012, c: [70, 170, 220], a: 0.070 }
+      ];
     }
 
-    function spawnShooting() {
-      if (shooting.length > 2 || Math.random() > 0.35) return;
-      shooting.push({
-        x: Math.random() * w * 0.7,
-        y: Math.random() * h * 0.35,
-        len: Math.random() * 160 + 90,
-        speed: Math.random() * 5 + 5,
+    function palette(hue) {
+      if (hue === 'gold') return '242, 215, 155';
+      if (hue === 'ice') return '180, 215, 255';
+      return '255, 255, 255';
+    }
+
+    function spawnComet() {
+      if (comets.length >= 4) return;
+      var fromLeft = Math.random() > 0.35;
+      comets.push({
+        x: fromLeft ? rnd(-w * 0.2, w * 0.55) : rnd(w * 0.5, w * 1.2),
+        y: rnd(-h * 0.05, h * 0.55),
+        ang: fromLeft ? rnd(0.28, 0.62) : rnd(Math.PI - 0.62, Math.PI - 0.28),
+        speed: rnd(6.5, 13),
+        len: rnd(110, 260),
         life: 1,
-        angle: Math.PI / 5 + Math.random() * 0.2
+        decay: rnd(0.0045, 0.0095),
+        width: rnd(1.1, 2.5),
+        hue: Math.random() > 0.85 ? 'gold' : 'ice'
       });
     }
 
-    function frame() {
+    function addSpark(x, y) {
+      var n = 18;
+      for (var i = 0; i < n; i++) {
+        var ang = (Math.PI * 2 * i) / n + rnd(-0.2, 0.2);
+        var sp = rnd(1.2, 5.2);
+        sparks.push({ x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, decay: rnd(0.015, 0.032) });
+      }
+    }
+
+    function frame(ts) {
+      if (!last) last = ts;
+      var rawDt = ts - last;
+      last = ts;
+      var dt = rawDt > 50 ? 2 : rawDt / 16.67;
+
       ctx.clearRect(0, 0, w, h);
 
-      for (var i = 0; i < stars.length; i++) {
-        var s = stars[i];
-        s.a += s.tw * s.dir;
-        if (s.a > 0.92 || s.a < 0.14) s.dir *= -1;
-        var y = s.y - scrollY * s.depth * 0.06;
-        y = ((y % (h * 1.2)) + h * 1.2) % (h * 1.2);
-        if (y > h + 6) continue;
-        var color = s.hue === 'gold' ? '242, 215, 155' : (s.hue === 'ice' ? '180, 215, 255' : '255, 255, 255');
+      // 星云：极慢漂移 + 呼吸
+      ctx.globalCompositeOperation = 'source-over';
+      for (var c = 0; c < clouds.length; c++) {
+        var cl = clouds[c];
+        cl.x += cl.vx * dt;
+        cl.y += cl.vy * dt;
+        if (cl.x < -cl.r * 0.5) cl.x = w + cl.r * 0.4;
+        if (cl.x > w + cl.r * 0.5) cl.x = -cl.r * 0.4;
+        if (cl.y < -cl.r * 0.5) cl.y = h + cl.r * 0.4;
+        if (cl.y > h + cl.r * 0.5) cl.y = -cl.r * 0.4;
+        cl.ph = (cl.ph || 0) + 0.0035 * dt;
+        var pulse = 0.82 + 0.18 * Math.sin(cl.ph);
+        var g = ctx.createRadialGradient(cl.x, cl.y, 0, cl.x, cl.y, cl.r);
+        g.addColorStop(0, 'rgba(' + cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2] + ', ' + (cl.a * pulse).toFixed(3) + ')');
+        g.addColorStop(0.55, 'rgba(' + cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2] + ', ' + (cl.a * pulse * 0.35).toFixed(3) + ')');
+        g.addColorStop(1, 'rgba(' + cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2] + ', 0)');
+        ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + color + ', ' + s.a.toFixed(3) + ')';
-        ctx.arc(s.x, y, s.r, 0, Math.PI * 2);
+        ctx.arc(cl.x, cl.y, cl.r, 0, Math.PI * 2);
         ctx.fill();
-        if (s.r > 1.15) {
-          ctx.beginPath();
-          ctx.fillStyle = 'rgba(' + color + ', ' + (s.a * 0.14).toFixed(3) + ')';
-          ctx.arc(s.x, y, s.r * 3.4, 0, Math.PI * 2);
-          ctx.fill();
-        }
       }
 
-      for (var j = shooting.length - 1; j >= 0; j--) {
-        var m = shooting[j];
-        var dx = Math.cos(m.angle), dy = Math.sin(m.angle);
-        var g = ctx.createLinearGradient(m.x, m.y, m.x - dx * m.len, m.y - dy * m.len);
-        g.addColorStop(0, 'rgba(220, 240, 255, ' + (0.85 * m.life).toFixed(3) + ')');
-        g.addColorStop(1, 'rgba(220, 240, 255, 0)');
-        ctx.strokeStyle = g;
-        ctx.lineWidth = 1.6;
+      // 星尘：缓缓上浮
+      for (var i = 0; i < dust.length; i++) {
+        var p = dust[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.ph += 0.03 * dt;
+        if (p.y < -12) { p.y = h + 10; p.x = Math.random() * w; }
+        if (p.x < -12) p.x = w + 10;
+        if (p.x > w + 12) p.x = -10;
+        var da = p.a * (0.55 + 0.45 * Math.sin(p.ph));
         ctx.beginPath();
-        ctx.moveTo(m.x, m.y);
-        ctx.lineTo(m.x - dx * m.len, m.y - dy * m.len);
-        ctx.stroke();
-        m.x += dx * m.speed;
-        m.y += dy * m.speed;
-        m.life -= 0.012;
-        if (m.life <= 0 || m.x > w + 200 || m.y > h + 200) shooting.splice(j, 1);
+        ctx.fillStyle = 'rgba(' + palette(p.hue) + ', ' + da.toFixed(3) + ')';
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // 平均 4~8 秒来一颗流星，保证"能看见在动"
-      if (Math.random() < 0.02) spawnShooting();
-      window.requestAnimationFrame(frame);
+      // 星点：闪烁 + 视差 + 鼠标高亮
+      for (var s = 0; s < stars.length; s++) {
+        var st = stars[s];
+        st.a += st.tw * st.dir * dt;
+        if (st.a >= 0.97) { st.a = 0.97; st.dir = -1; }
+        if (st.a <= 0.18) { st.a = 0.18; st.dir = 1; }
+
+        var y = st.y - scrollY * st.depth * 0.08;
+        var span = h * 1.25;
+        y = ((y % span) + span) % span;
+        if (y > h + 8) continue;
+
+        var boost = 0;
+        var dxm = st.x - mx, dym = y - my;
+        if (dxm * dxm + dym * dym < 19000) boost = 0.45;
+
+        var alpha = Math.min(1, st.a + boost);
+        var col = palette(st.hue);
+
+        if (st.flare) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.beginPath();
+          ctx.fillStyle = 'rgba(' + col + ', ' + (alpha * 0.10).toFixed(3) + ')';
+          ctx.arc(st.x, y, st.r * 7.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+        }
+
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(' + col + ', ' + alpha.toFixed(3) + ')';
+        ctx.arc(st.x, y, st.r * (1 + boost), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 彗星：常驻划过
+      ctx.globalCompositeOperation = 'lighter';
+      for (var m = comets.length - 1; m >= 0; m--) {
+        var cm = comets[m];
+        var dx = Math.cos(cm.ang), dy = Math.sin(cm.ang);
+        var tx = cm.x - dx * cm.len, ty = cm.y - dy * cm.len;
+        var grad = ctx.createLinearGradient(cm.x, cm.y, tx, ty);
+        var col2 = palette(cm.hue);
+        grad.addColorStop(0, 'rgba(255, 255, 255, ' + (0.95 * cm.life).toFixed(3) + ')');
+        grad.addColorStop(0.18, 'rgba(' + col2 + ', ' + (0.70 * cm.life).toFixed(3) + ')');
+        grad.addColorStop(1, 'rgba(' + col2 + ', 0)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = cm.width;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cm.x, cm.y);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+
+        // 头部光晕
+        var hg = ctx.createRadialGradient(cm.x, cm.y, 0, cm.x, cm.y, 16);
+        hg.addColorStop(0, 'rgba(255, 255, 255, ' + (0.9 * cm.life).toFixed(3) + ')');
+        hg.addColorStop(1, 'rgba(' + col2 + ', 0)');
+        ctx.fillStyle = hg;
+        ctx.beginPath();
+        ctx.arc(cm.x, cm.y, 16, 0, Math.PI * 2);
+        ctx.fill();
+
+        cm.x += dx * cm.speed * dt;
+        cm.y += dy * cm.speed * dt;
+        cm.life -= cm.decay * dt;
+        if (cm.life <= 0 || cm.x < -w * 0.6 || cm.x > w * 1.6 || cm.y > h * 1.4) comets.splice(m, 1);
+      }
+
+      // 点击爆开的星光
+      for (var k = sparks.length - 1; k >= 0; k--) {
+        var sp = sparks[k];
+        sp.x += sp.vx * dt;
+        sp.y += sp.vy * dt;
+        sp.vx *= 0.975;
+        sp.vy *= 0.975;
+        sp.life -= sp.decay * dt;
+        if (sp.life <= 0) { sparks.splice(k, 1); continue; }
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(255, 246, 214, ' + sp.life.toFixed(3) + ')';
+        ctx.arc(sp.x, sp.y, 1.7 * sp.life, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+
+      // 彗星节奏：平均 2.5~5 秒一颗，偶尔双发
+      acc += rawDt;
+      if (acc > cometAt) {
+        spawnComet();
+        if (Math.random() > 0.72) spawnComet();
+        cometAt = rnd(2500, 5000);
+        acc = 0;
+      }
+
+      frameId = window.requestAnimationFrame(frame);
     }
+
+    function start() { if (frameId === null) { last = 0; frameId = window.requestAnimationFrame(frame); } }
+    function stop() { if (frameId !== null) { window.cancelAnimationFrame(frameId); frameId = null; } }
 
     window.addEventListener('resize', resize, { passive: true });
     window.addEventListener('scroll', function () { scrollY = window.scrollY || 0; }, { passive: true });
+    window.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; }, { passive: true });
+    window.addEventListener('mouseout', function () { mx = -9999; my = -9999; });
+    window.addEventListener('pointerdown', function (e) { addSpark(e.clientX, e.clientY); }, { passive: true });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) stop(); else start();
+    });
+
     resize();
-    window.requestAnimationFrame(frame);
+
+    if (reduceMotion) {
+      // 尊重"减少动态效果"：画一帧静态星空，不启动动画循环
+      last = 16; acc = 0; cometAt = 1e9;
+      frame(32);
+      stop();
+      return;
+    }
+    start();
   }
 
   /* ------------------------------------------------------- 滚动叙事与高亮 */
