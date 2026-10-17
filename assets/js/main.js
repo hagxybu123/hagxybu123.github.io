@@ -22,7 +22,7 @@
     skyNotes.push(msg);
     try {
       var st = document.getElementById('buildStamp');
-      if (st) st.textContent = 'v8 · 2026-10-16 · ⚠ ' + msg;
+      if (st) st.textContent = 'v9 · 2026-10-17 · ⚠ ' + msg;
     } catch (e) {}
   }
 
@@ -1446,10 +1446,10 @@
       if (cv) cv.style.display = 'none';
       var note = '已切换到 CSS 星层（' + reason + '）';
       var stamp = $('#buildStamp');
-      if (stamp) stamp.textContent = 'v8 · 2026-10-16 · ' + note;
+      if (stamp) stamp.textContent = 'v9 · 2026-10-17 · ' + note;
       var tag = document.querySelector ? document.querySelector('.build-tag') : null;
-      if (tag) tag.textContent = 'v8 · 2026-10-16 · ' + note;
-      document.title = '天逸 · 星庭 [v8] · ' + note;
+      if (tag) tag.textContent = 'v9 · 2026-10-17 · ' + note;
+      document.title = '天逸 · 星庭 [v9] · ' + note;
       if (window.console && console.info) console.info('[星庭] ' + note);
     } catch (e) {}
   }
@@ -2376,7 +2376,7 @@
             return;   // 标记与标题已由 enableCssSky 写好
           }
 
-          var parts = ['v8 · 2026-10-16'];
+          var parts = ['v9 · 2026-10-17'];
           if (reduceMotion) parts.push('⚠ 系统开启了"减少动态效果"，动画已停用');
           else parts.push('动画已启动');
           parts.push(chk.note);
@@ -2384,7 +2384,7 @@
           var line = parts.join(' · ');
           if (stamp) stamp.textContent = line;
           if (tag) tag.textContent = line;
-          document.title = '天逸 · 星庭 [v8] · ' + chk.note;
+          document.title = '天逸 · 星庭 [v9] · ' + chk.note;
         } catch (e) {}
       }, 900);
     } catch (e) {}
