@@ -1340,9 +1340,11 @@
     var ringLayer = $('#cssRings');
     if (!layer) return;
 
-    // 屏幕小的少放一些，避免手机负担
+    /* 元素数量是 CSS 动画成本的主因：每个元素都有自己的动画与样式计算。
+       实测 300 个元素在手机上明显卡顿，因此大幅削减 ——
+       观感上几乎察觉不到（真实星空的亮点本来也稀疏）。 */
     var narrow = window.innerWidth < 760;
-    var count = narrow ? 150 : 300;
+    var count = narrow ? 65 : 140;
 
     // 用 DocumentFragment 一次性插入，避免逐条触发重排
     var frag = document.createDocumentFragment();
@@ -1360,38 +1362,56 @@
       var hue = roll > 0.86 ? '255, 232, 168' : (roll > 0.56 ? '205, 232, 255' : '255, 255, 255');
       st.style.color = 'rgb(' + hue + ')';
       st.style.background = 'rgb(' + hue + ')';
-      // 大星星加光晕与星芒
-      if (size > 2.4) {
-        st.className = 'flare';
-        st.style.boxShadow = '0 0 ' + (size * 5).toFixed(1) + 'px ' + (size * 2).toFixed(1) + 'px rgba(' + hue + ', .85)';
-      } else {
-        st.style.boxShadow = '0 0 ' + (size * 3).toFixed(1) + 'px rgba(' + hue + ', .7)';
-      }
+      /* 关键优化：只给极少数"亮星"加光晕与星芒。
+         原来给每颗星都设 box-shadow，等于数百个大范围阴影同时重绘，代价极高。 */
+      if (roll > 0.95) st.className = 'flare big';
+      else if (roll > 0.88) st.className = 'big';
       frag.appendChild(st);
     }
     layer.appendChild(frag);
+    // 星层整体独立合成：一次性，避免每帧重新合成整页
+    layer.style.contain = 'strict';
 
-    // DOM 版星环：点击时插入三个扩散圆环，动画结束后自动移除
+    /* DOM 版星环：对象池复用 + 只做 transform 缩放。
+       优化点：
+         · 原来每次点击新建 3 个元素、动画后销毁 —— 频繁增删 DOM 很贵
+         · 改为固定 2 道环并复用元素；点得再快也不会堆积
+         · 去掉 box-shadow（大范围阴影每帧重绘）
+         · 动画只动 transform 与 opacity（纯合成，不重排不重绘） */
+    var RING_SPECS = [
+      { w: 5.0, c: '255, 226, 150' },
+      { w: 3.0, c: '190, 224, 255' }
+    ];
+    var ringPool = [];
+    var ringBusy = [];
+    for (var rp = 0; rp < RING_SPECS.length; rp++) {
+      var rEl = document.createElement('span');
+      rEl.className = 'css-ring';
+      rEl.style.border = RING_SPECS[rp].w.toFixed(1) + 'px solid rgba(' + RING_SPECS[rp].c + ', .95)';
+      ringPool.push(rEl);
+      ringBusy.push(false);
+    }
+
     function spawnRings(x, y) {
       if (!ringLayer) return;
-      var specs = [
-        { w: 5.0, c: '255, 226, 150', delay: 0 },
-        { w: 3.4, c: '190, 224, 255', delay: 60 },
-        { w: 2.2, c: '255, 255, 255', delay: 120 }
-      ];
-      specs.forEach(function (sp, idx) {
-        var el = document.createElement('span');
-        el.className = 'css-ring';
+      for (var i2 = 0; i2 < ringPool.length; i2++) {
+        if (ringBusy[i2]) continue;          // 正在播放就跳过，避免堆积
+        ringBusy[i2] = true;
+        var el = ringPool[i2];
         el.style.left = x + 'px';
         el.style.top = y + 'px';
-        el.style.border = sp.w.toFixed(1) + 'px solid rgba(' + sp.c + ', .95)';
-        el.style.boxShadow = '0 0 ' + (sp.w * 6).toFixed(0) + 'px rgba(' + sp.c + ', .8)';
-        el.style.animationDelay = sp.delay + 'ms';
-        ringLayer.appendChild(el);
-        window.setTimeout(function () {
-          if (el.parentNode) el.parentNode.removeChild(el);
-        }, 1400 + sp.delay);
-      });
+        // 重新触发动画：先置空、强制重排、再恢复
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = '';
+        if (!el.parentNode) ringLayer.appendChild(el);
+        (function (idx, node) {
+          window.setTimeout(function () {
+            ringBusy[idx] = false;
+            if (node.parentNode) node.parentNode.removeChild(node);
+          }, 1250);
+        })(i2, el);
+      }
     }
 
     // 只在降级模式下接管点击：canvas 正常时由 canvas 画更漂亮的星环
