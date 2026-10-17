@@ -151,6 +151,10 @@ html[data-theme="light"] {
        因此把中心那层略为提高一点不透明度作为补偿。 */
     radial-gradient(120% 90% at 50% 42%, rgba(30, 52, 120, .62) 0%, rgba(6, 11, 34, .97) 62%, #04081a 100%);
   transition: opacity .75s var(--ease), transform .75s var(--ease), visibility .75s;
+  /* 这是一个铺满视口的元素，还带径向渐变背景。
+     做 scale / opacity 动画时，若不提升为独立合成层，
+     浏览器每帧都要重绘整屏渐变 —— 那就是"开场不够顺畅"。 */
+  will-change: transform, opacity;
 }
 /* 开场页也要有星星 */
 .entry::before {
@@ -193,6 +197,7 @@ html[data-theme="light"] {
   visibility: hidden;
   transform: scale(1.06);
   pointer-events: none;
+  will-change: auto;
 }
 /* 兜底：即使脚本完全没跑，开场页也会在 12 秒后自动消失，不会永久挡住页面 */
 @keyframes entry-failsafe {
@@ -350,6 +355,19 @@ body.is-locked .css-stars,
 body.is-locked #sky {
   animation-play-state: paused !important;
 }
+/* 开场页盖屏期间，把整层星空隐藏并停掉它上面所有动画。
+   为什么不只是"暂停动画"：静态图层同样要参与每帧合成，
+   而开场页是完全不透明的，用户根本看不到它们 —— 纯属浪费。
+   用 opacity 而不是 display，进站后恢复时不会有布局跳动。 */
+body.is-locked .css-stars {
+  opacity: 0 !important;
+}
+body.is-locked .css-stars .star-twinkle,
+body.is-locked .css-stars i,
+body.is-locked .css-stars .star-layer {
+  animation-play-state: paused !important;
+}
+
 body.is-locked .aurora-blob,
 body.is-locked .sparkles span {
   animation-play-state: paused !important;
@@ -2223,6 +2241,7 @@ html:not(.use-css-stars) .css-stars * {
   /* 收尾 1.5 秒里，这些独立动画都被外层统一动画盖住了，
      继续推进只是白耗帧时间。一并暂停能让开场明显更顺。 */
   animation-play-state: paused !important;
+  will-change: transform, opacity;
 }
 
 @keyframes css-tear-out {
@@ -2271,6 +2290,7 @@ html:not(.use-css-stars) .css-stars * {
   pointer-events: none;
   z-index: 2;
   animation: css-wave-out 1.5s cubic-bezier(.16, .72, .28, 1) forwards;
+  will-change: transform, opacity;
 }
 
 @keyframes css-wave-out {
@@ -2282,6 +2302,7 @@ html:not(.use-css-stars) .css-stars * {
 /* 标题与头像在汇聚时向内收，强化"被吸进去"的感觉 */
 .entry.is-css-tear .entry-inner {
   animation: css-tear-inner 1.5s cubic-bezier(.4, 0, .2, 1) forwards;
+  will-change: transform, opacity;
 }
 
 @keyframes css-tear-inner {
