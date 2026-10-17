@@ -1971,6 +1971,57 @@
        帧率上限、resize 防重分配依然会闪。既然优化解决不了，就换纯 CSS 实现。 */
     var canVortex = !!(vortex && vctx) && !reduceMotion && !isX5;
 
+    /* ---------------------------------------------------------------- CSS 版开场
+       在 X5 下用真实 DOM 元素复现 canvas 版的「粒子汇聚 -> 中心亮爆 -> 双重冲击波」。
+       为什么不用 ::before / ::after：它们只有两个，而这里需要三组独立运动；
+       而且之前我把 ::before 误加进了"暂停规则"，导致光核动画消失过（已修）。
+       所有元素只跑 transform / opacity 动画，不触发布局与重绘。 */
+    function buildCssTear(host) {
+      try {
+        var stage = document.createElement('div');
+        stage.className = 'cte-stage';
+
+        // ① 汇聚粒子：12 颗均匀分布在外圈，整体从 scale(2.9) 收缩到 scale(.06)
+        var dots = document.createElement('div');
+        dots.className = 'cte-dots';
+        var DN = 12;
+        for (var i = 0; i < DN; i++) {
+          var d = document.createElement('i');
+          var ang = (i / DN) * Math.PI * 2;
+          var radius = 96;                      // 起始半径（px），再靠 scale 放大
+          var size = rnd(3.2, 5.6);
+          d.style.width = size.toFixed(1) + 'px';
+          d.style.height = size.toFixed(1) + 'px';
+          d.style.left = (Math.cos(ang) * radius - size / 2).toFixed(1) + 'px';
+          d.style.top = (Math.sin(ang) * radius - size / 2).toFixed(1) + 'px';
+          // 金 / 冰蓝 / 白 三色，与原 canvas 版一致
+          var hue = i % 3 === 0 ? '255, 232, 168' : (i % 3 === 1 ? '205, 232, 255' : '255, 255, 255');
+          d.style.background = 'rgb(' + hue + ')';
+          d.style.opacity = rnd(0.7, 1).toFixed(2);
+          dots.appendChild(d);
+        }
+        stage.appendChild(dots);
+
+        // ② 中心光核
+        var core = document.createElement('div');
+        core.className = 'cte-core';
+        stage.appendChild(core);
+
+        // ③ 两道冲击波
+        var w1 = document.createElement('div');
+        w1.className = 'cte-wave w1';
+        stage.appendChild(w1);
+        var w2 = document.createElement('div');
+        w2.className = 'cte-wave w2';
+        stage.appendChild(w2);
+
+        host.appendChild(stage);
+      } catch (e) {
+        // 注入失败也不影响进站，只是少了这段动画
+        if (window.console && console.warn) console.warn('[星庭] CSS 开场动画注入失败:', e);
+      }
+    }
+
     function enter() {
       if (closed) return;
       closed = true;
@@ -1983,19 +2034,22 @@
         phaseAt = Date.now();
         vframe();
       } else if (isX5) {
-        /* X5 内核下不走 canvas 漩涡，改用纯 CSS 的"星光汇聚"：
-           只加一个类，动画全部由 CSS 关键帧完成，JS 不再参与任何绘制。
+        /* X5 内核下不走 canvas 漩涡，改用纯 CSS 的"星光汇聚 -> 炸裂"：
+           由 buildCssTear() 注入真实 DOM 元素（汇聚粒子 / 光核 / 两道冲击波），
+           动画全部由 CSS 关键帧完成，JS 不再参与任何逐帧绘制。
            这是为了绕开 X5 无法稳定渲染动画 canvas 的问题。 */
         entry.classList.add('is-sucking', 'is-css-tear');
+        buildCssTear(entry);
       }
 
       try { sessionStorage.setItem('tianyi-entered', '1'); } catch (e) {}
 
-      /* 时长：canvas 漩涡约 1.9s 收尾；X5 的 CSS 版本略短一些，
-         避免用户在开场页等太久。 */
+      /* 时长：canvas 漩涡约 1.9s；CSS 版动画总长约 2.25s
+         （汇聚 1.05s + 冲击波延迟 0.98s + 扩散 1.05s），
+         所以收尾时间要留足，否则动画还没播完开场页就被移除了。 */
       var cssTear = isX5 && !canVortex;
-      var uiDelay = canVortex ? 1000 : (cssTear ? 760 : 0);
-      var killDelay = canVortex ? 1900 : (cssTear ? 1500 : 820);
+      var uiDelay = canVortex ? 1000 : (cssTear ? 1150 : 0);
+      var killDelay = canVortex ? 1900 : (cssTear ? 2300 : 820);
 
       window.setTimeout(function () {
         entry.classList.add('is-gone');
