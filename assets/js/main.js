@@ -48,52 +48,54 @@
       stars = [];
       // 窄屏（手机）自动降级，保证 60fps 不掉帧
       var mobile = w < 760;
-      var density = mobile ? 11000 : 6200;
-      var cap = mobile ? 170 : 320;
-      var count = Math.round(Math.min(cap, Math.max(mobile ? 80 : 140, (w * h) / density)));
-      var flareRate = mobile ? 0.62 : 0.4;
+      var density = mobile ? 9000 : 5200;
+      var cap = mobile ? 190 : 380;
+      var count = Math.round(Math.min(cap, Math.max(mobile ? 90 : 160, (w * h) / density)));
+      var flareRate = mobile ? 0.55 : 0.32;
       for (var i = 0; i < count; i++) {
         var roll = Math.random();
-        var hue = roll > 0.62 ? 'gold' : (roll > 0.3 ? 'ice' : 'white');
+        var hue = roll > 0.58 ? 'gold' : (roll > 0.26 ? 'ice' : 'white');
         stars.push({
           x: Math.random() * w,
           y: Math.random() * h * 1.2,
-          r: hue === 'gold' ? rnd(1.4, 4.6) : rnd(1.0, 3.8),
-          a: hue === 'gold' ? rnd(0.80, 1) : rnd(0.62, 1),
-          tw: rnd(0.016, 0.055),
+          r: hue === 'gold' ? rnd(1.8, 5.6) : rnd(1.3, 4.6),
+          // 亮度下限拉高，星星"淡"的根源就在这里
+          a: hue === 'gold' ? rnd(0.92, 1) : rnd(0.80, 1),
+          tw: rnd(0.020, 0.062),
           dir: Math.random() > 0.5 ? 1 : -1,
           depth: rnd(0.15, 0.9),
           hue: hue,
-          // 六成亮星带十字星芒，密集的星芒就是"冲击力"的来源
           flare: Math.random() > flareRate
         });
       }
 
       dust = [];
-      var dCount = Math.round(Math.min(mobile ? 110 : 200, Math.max(80, (w * h) / 9000)));
+      var dCount = Math.round(Math.min(mobile ? 120 : 220, Math.max(80, (w * h) / 8000)));
       for (var d = 0; d < dCount; d++) {
         dust.push({
           x: Math.random() * w,
           y: Math.random() * h,
-          r: rnd(2, 5.5),
+          r: rnd(2.2, 6),
           vx: rnd(-0.18, 0.18),
           vy: rnd(-0.34, -0.08),
-          a: rnd(0.28, 0.7),
-          hue: Math.random() > 0.35 ? 'gold' : 'ice',
+          a: rnd(0.35, 0.8),
+          hue: Math.random() > 0.32 ? 'gold' : 'ice',
           ph: Math.random() * 6.28
         });
       }
 
+      // 星云：亮色云团（中心实、边缘透），是"星光感"的主体
       clouds = [
-        { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.46, vx: 0.02, vy: 0.01, c: [96, 140, 255], a: 0.42 },
-        { x: w * 0.82, y: h * 0.18, r: Math.max(w, h) * 0.42, vx: -0.015, vy: 0.012, c: [170, 110, 245], a: 0.38 },
-        { x: w * 0.55, y: h * 0.72, r: Math.max(w, h) * 0.50, vx: 0.011, vy: -0.014, c: [60, 175, 230], a: 0.32 }
+        { x: w * 0.18, y: h * 0.24, r: Math.max(w, h) * 0.44, vx: 0.022, vy: 0.011, c: [104, 152, 255], a: 0.92 },
+        { x: w * 0.82, y: h * 0.18, r: Math.max(w, h) * 0.40, vx: -0.016, vy: 0.013, c: [178, 118, 250], a: 0.86 },
+        { x: w * 0.55, y: h * 0.72, r: Math.max(w, h) * 0.48, vx: 0.012, vy: -0.015, c: [64, 186, 240], a: 0.78 },
+        { x: w * 0.42, y: h * 0.12, r: Math.max(w, h) * 0.30, vx: -0.010, vy: 0.014, c: [242, 205, 140], a: 0.55 }
       ];
     }
 
     function palette(hue) {
-      if (hue === 'gold') return '255, 226, 152';
-      if (hue === 'ice') return '190, 224, 255';
+      if (hue === 'gold') return '255, 232, 168';
+      if (hue === 'ice') return '205, 232, 255';
       return '255, 255, 255';
     }
 
@@ -136,7 +138,7 @@
 
       ctx.clearRect(0, 0, w, h);
 
-      // 星云：极慢漂移 + 呼吸
+      // 星云：亮色云团，中心实、边缘透 —— 这是"星光"的主体
       ctx.globalCompositeOperation = 'source-over';
       for (var c = 0; c < clouds.length; c++) {
         var cl = clouds[c];
@@ -147,11 +149,14 @@
         if (cl.y < -cl.r * 0.5) cl.y = h + cl.r * 0.4;
         if (cl.y > h + cl.r * 0.5) cl.y = -cl.r * 0.4;
         cl.ph = (cl.ph || 0) + 0.0035 * dt;
-        var pulse = 0.82 + 0.18 * Math.sin(cl.ph);
+        var pulse = 0.80 + 0.20 * Math.sin(cl.ph);
         var g = ctx.createRadialGradient(cl.x, cl.y, 0, cl.x, cl.y, cl.r);
-        g.addColorStop(0, 'rgba(' + cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2] + ', ' + (cl.a * pulse).toFixed(3) + ')');
-        g.addColorStop(0.55, 'rgba(' + cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2] + ', ' + (cl.a * pulse * 0.35).toFixed(3) + ')');
-        g.addColorStop(1, 'rgba(' + cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2] + ', 0)');
+        var cc = cl.c[0] + ', ' + cl.c[1] + ', ' + cl.c[2];
+        // 多层停靠点：中心明亮，中段仍有厚度，边缘才散开
+        g.addColorStop(0, 'rgba(' + cc + ', ' + Math.min(1, cl.a * pulse * 0.48).toFixed(3) + ')');
+        g.addColorStop(0.30, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.26).toFixed(3) + ')');
+        g.addColorStop(0.62, 'rgba(' + cc + ', ' + (cl.a * pulse * 0.11).toFixed(3) + ')');
+        g.addColorStop(1, 'rgba(' + cc + ', 0)');
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(cl.x, cl.y, cl.r, 0, Math.PI * 2);
@@ -179,7 +184,7 @@
         var st = stars[s];
         st.a += st.tw * st.dir * dt;
         if (st.a >= 1) { st.a = 1; st.dir = -1; }
-        if (st.a <= 0.46) { st.a = 0.46; st.dir = 1; }
+        if (st.a <= 0.58) { st.a = 0.58; st.dir = 1; }
 
         var y = st.y - scrollY * st.depth * 0.08;
         var span = h * 1.25;
@@ -194,38 +199,49 @@
         var col = palette(st.hue);
         var radius = st.r * (1 + boost);
 
-        // 每颗星都有一层光晕，密集成片后就是"星空扑面而来"的观感
         ctx.globalCompositeOperation = 'lighter';
-        ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + col + ', ' + (alpha * (st.flare ? 0.34 : 0.16)).toFixed(3) + ')';
-        ctx.arc(st.x, y, radius * (st.flare ? 8 : 4), 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
 
+        // ① 外层彩色光晕：整片星空发光的来源
+        var glowR = radius * (st.flare ? 9 : 5);
+        var gg = ctx.createRadialGradient(st.x, y, 0, st.x, y, glowR);
+        gg.addColorStop(0, 'rgba(' + col + ', ' + (alpha * 0.55).toFixed(3) + ')');
+        gg.addColorStop(0.45, 'rgba(' + col + ', ' + (alpha * 0.18).toFixed(3) + ')');
+        gg.addColorStop(1, 'rgba(' + col + ', 0)');
+        ctx.fillStyle = gg;
+        ctx.beginPath();
+        ctx.arc(st.x, y, glowR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // ② 十字星芒
         if (st.flare) {
-          // 十字星芒：金色优先，四向光针拉长
-          ctx.globalCompositeOperation = 'lighter';
-          var ray = st.r * (st.hue === 'gold' ? 16 : 11);
-          ctx.strokeStyle = 'rgba(' + col + ', ' + (alpha * 0.75).toFixed(3) + ')';
-          ctx.lineWidth = 1.3;
+          var ray = st.r * (st.hue === 'gold' ? 17 : 12);
+          ctx.strokeStyle = 'rgba(' + col + ', ' + (alpha * 0.85).toFixed(3) + ')';
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.moveTo(st.x - ray, y); ctx.lineTo(st.x + ray, y);
           ctx.moveTo(st.x, y - ray); ctx.lineTo(st.x, y + ray);
           ctx.stroke();
-          // 斜向短针，让星芒更立体
-          var ray2 = ray * 0.45;
-          ctx.strokeStyle = 'rgba(' + col + ', ' + (alpha * 0.42).toFixed(3) + ')';
+          var ray2 = ray * 0.42;
+          ctx.strokeStyle = 'rgba(' + col + ', ' + (alpha * 0.5).toFixed(3) + ')';
           ctx.beginPath();
           ctx.moveTo(st.x - ray2, y - ray2); ctx.lineTo(st.x + ray2, y + ray2);
           ctx.moveTo(st.x - ray2, y + ray2); ctx.lineTo(st.x + ray2, y - ray2);
           ctx.stroke();
-          ctx.globalCompositeOperation = 'source-over';
         }
 
+        // ③ 白芯：星星"亮"的关键，彩色外圈 + 纯白内芯
         ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + col + ', ' + alpha.toFixed(3) + ')';
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + alpha.toFixed(3) + ')';
+        ctx.arc(st.x, y, radius * 0.62, 0, Math.PI * 2);
+        ctx.fill();
+
+        // ④ 再补一层色彩，让色相透出来
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(' + col + ', ' + (alpha * 0.9).toFixed(3) + ')';
         ctx.arc(st.x, y, radius, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.globalCompositeOperation = 'source-over';
       }
 
       // 彗星：常驻划过

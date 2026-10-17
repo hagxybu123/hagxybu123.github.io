@@ -5,11 +5,11 @@
 
 /* ------------------------------ 设计变量 ------------------------------ */
 :root {
-  --navy-900: #05081a;
-  --navy-800: #080d24;
-  --navy-700: #0d1430;
-  --navy-600: #131c42;
-  --navy-500: #1b2757;
+  --navy-900: #060b22;
+  --navy-800: #0a1130;
+  --navy-700: #101a42;
+  --navy-600: #182455;
+  --navy-500: #223066;
 
   --ice-100: #eaf4ff;
   --ice-200: #c7e2ff;
@@ -85,7 +85,7 @@ body {
   transition: background .5s var(--ease), color .5s var(--ease);
 }
 
-/* 静态星点兜底：万一 JS 没跑起来，背景依然是一片清晰的夜空 */
+/* 静态星云色 + 星点兜底：万一 JS 没跑起来，背景依然是一片明亮的星空 */
 body::before {
   content: "";
   position: fixed;
@@ -94,20 +94,32 @@ body::before {
   pointer-events: none;
   opacity: 1;
   background-image:
-    radial-gradient(2.2px 2.2px at 12% 18%, rgba(255,255,255,1), transparent 100%),
-    radial-gradient(1.8px 1.8px at 74% 8%,  rgba(210,232,255,.95), transparent 100%),
-    radial-gradient(2.6px 2.6px at 46% 34%, rgba(255,255,255,.92), transparent 100%),
-    radial-gradient(2.0px 2.0px at 88% 52%, rgba(255,226,160,.95), transparent 100%),
-    radial-gradient(2.2px 2.2px at 26% 66%, rgba(255,255,255,.85), transparent 100%),
-    radial-gradient(1.7px 1.7px at 62% 78%, rgba(210,232,255,.9), transparent 100%),
-    radial-gradient(2.3px 2.3px at 8%  88%, rgba(255,255,255,.8), transparent 100%),
-    radial-gradient(1.9px 1.9px at 94% 26%, rgba(255,255,255,.88), transparent 100%),
-    radial-gradient(1.8px 1.8px at 36% 50%, rgba(255,226,160,.85), transparent 100%),
-    radial-gradient(2.1px 2.1px at 58% 14%, rgba(255,255,255,.95), transparent 100%),
-    radial-gradient(1.6px 1.6px at 18% 42%, rgba(255,255,255,.75), transparent 100%),
-    radial-gradient(2.4px 2.4px at 82% 74%, rgba(255,226,160,.8), transparent 100%);
+    /* 底层：大块星云色，让背景不再是死黑 */
+    radial-gradient(52% 42% at 16% 20%, rgba(96, 140, 255, .40), transparent 68%),
+    radial-gradient(46% 38% at 84% 16%, rgba(168, 108, 245, .36), transparent 68%),
+    radial-gradient(56% 46% at 56% 78%, rgba(56, 176, 235, .30), transparent 70%),
+    radial-gradient(34% 26% at 40% 8%,  rgba(242, 205, 140, .26), transparent 70%),
+    /* 上层：密度更高的星点，纯白高亮 */
+    radial-gradient(2.6px 2.6px at 12% 18%, rgba(255,255,255,1), transparent 100%),
+    radial-gradient(2.1px 2.1px at 74% 8%,  rgba(220,238,255,1), transparent 100%),
+    radial-gradient(3.0px 3.0px at 46% 34%, rgba(255,255,255,1), transparent 100%),
+    radial-gradient(2.4px 2.4px at 88% 52%, rgba(255,232,170,1), transparent 100%),
+    radial-gradient(2.6px 2.6px at 26% 66%, rgba(255,255,255,1), transparent 100%),
+    radial-gradient(2.0px 2.0px at 62% 78%, rgba(220,238,255,1), transparent 100%),
+    radial-gradient(2.7px 2.7px at 8%  88%, rgba(255,255,255,.98), transparent 100%),
+    radial-gradient(2.2px 2.2px at 94% 26%, rgba(255,255,255,1), transparent 100%),
+    radial-gradient(2.1px 2.1px at 36% 50%, rgba(255,232,170,.98), transparent 100%),
+    radial-gradient(2.5px 2.5px at 58% 14%, rgba(255,255,255,1), transparent 100%),
+    radial-gradient(1.9px 1.9px at 18% 42%, rgba(255,255,255,.9), transparent 100%),
+    radial-gradient(2.8px 2.8px at 82% 74%, rgba(255,232,170,.95), transparent 100%),
+    radial-gradient(2.2px 2.2px at 68% 46%, rgba(255,255,255,.92), transparent 100%),
+    radial-gradient(2.0px 2.0px at 30% 88%, rgba(220,238,255,.9), transparent 100%);
+  /* 单值作用于所有图层：星云拉伸铺满，星点平铺重复 */
   background-repeat: repeat;
-  background-size: 460px 460px;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%,
+                   420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px,
+                   420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px,
+                   420px 420px, 420px 420px;
 }
 /* Canvas 星野接管后隐藏兜底层 */
 html.sky-live body::before { opacity: 0; transition: opacity 1.2s var(--ease); }
