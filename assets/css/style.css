@@ -559,6 +559,42 @@ html[data-theme="light"] .hero-veil {
   align-items: center;
 }
 
+/* 首屏头像徽章：延续开场页的浮动 + 旋转光环 */
+.hero-badge {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 20px;
+}
+.hero-badge img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--glass-bd-strong);
+  filter: drop-shadow(0 0 26px rgba(150, 195, 255, .85));
+  animation: entry-float 5s ease-in-out infinite;
+}
+.hero-badge-ring {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 1px dashed rgba(170, 205, 255, .55);
+  animation: spin 26s linear infinite;
+  pointer-events: none;
+}
+.hero-badge::after {
+  content: "";
+  position: absolute;
+  inset: -22px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 185, 255, .28), transparent 68%);
+  pointer-events: none;
+}
+
+/* 首屏主按钮沿用开场页的呼吸脉冲 */
+.btn-enter { animation: entry-pulse 3.2s ease-in-out infinite; }
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -693,14 +729,27 @@ body::after {
 .hero-card {
   position: relative;
   border-radius: var(--radius-xl);
-  border: 1px solid var(--glass-bd-strong);
+  border: 1px solid rgba(190, 220, 255, .34);
   background: var(--glass-bg);
   backdrop-filter: blur(18px);
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    0 34px 90px -30px rgba(0, 0, 0, .9),
+    0 0 60px -14px rgba(130, 175, 255, .55);
   overflow: hidden;
   transform-style: preserve-3d;
   transition: transform .5s var(--ease), box-shadow .5s var(--ease);
 }
+/* 旋转光晕：与开场页的旋转光环同一套语言 */
+.hero-card::after {
+  content: "";
+  position: absolute;
+  inset: -60%;
+  background: conic-gradient(from 0deg, transparent, rgba(150, 195, 255, .28), transparent 34%);
+  animation: spin 12s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.hero-card > * { position: relative; z-index: 1; }
 .hero-card::before {
   content: "";
   position: absolute;
