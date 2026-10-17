@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>天逸 · 星庭 | 在代码里，给自己造一座王宫</title>
+<meta name="description" content="天逸的个人星庭：一个把宝蓝丝绒和王室规矩都写进代码里的人。Python 学习者、网页爱好者，欢迎来到我的星庭。">
+<meta name="author" content="天逸">
+<meta name="theme-color" content="#070b1c">
+<meta property="og:type" content="website">
+<meta property="og:title" content="天逸 · 星庭">
+<meta property="og:description" content="在代码里，给自己造一座王宫。">
+<meta property="og:image" content="assets/img/portrait.jpg">
+<link rel="icon" href="assets/img/avatar.png" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/avatar.png">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="aurora" aria-hidden="true">
+  <span class="aurora-blob b1"></span>
+  <span class="aurora-blob b2"></span>
+  <span class="aurora-blob b3"></span>
+</div>
+<div class="scroll-progress" aria-hidden="true"><span id="progressBar"></span></div>
+
+<a class="skip-link" href="#home">跳到主要内容</a>
+
+<header class="site-header" id="siteHeader">
+  <div class="wrap nav-wrap">
+    <a class="brand" href="#home" aria-label="回到首页">
+      <img src="assets/img/avatar.png" alt="天逸的头像" width="40" height="40">
+      <span class="brand-text">
+        <b>天逸</b>
+        <i>星庭 · Star Court</i>
+      </span>
+    </a>
+
+    <nav class="nav" id="nav" aria-label="主导航">
+      <a href="#home" class="nav-link is-active">首页</a>
+      <a href="#about" class="nav-link">关于</a>
+      <a href="#skills" class="nav-link">技能</a>
+      <a href="#works" class="nav-link">项目</a>
+      <a href="#journey" class="nav-link">星轨</a>
+      <a href="#guestbook" class="nav-link">星简</a>
+    </nav>
+
+    <div class="nav-tools">
+      <button id="themeBtn" class="icon-btn" type="button" aria-label="切换亮色 / 暗色主题" title="切换主题">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/></svg>
+      </button>
+      <button id="menuBtn" class="icon-btn menu-btn" type="button" aria-label="打开菜单" aria-expanded="false" aria-controls="nav">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============================== HERO ============================== -->
+  <section class="hero" id="home">
+    <div class="hero-media" aria-hidden="true">
+      <img src="assets/img/hero.jpg" alt="" fetchpriority="high" decoding="async">
+      <div class="hero-veil"></div>
+    </div>
+
+    <div class="wrap hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow" data-reveal>
+          <span class="dot"></span> 星庭已开 · 欢迎回来
+        </p>
+        <h1 class="hero-title" data-reveal>
+          <span class="grad">在代码里</span><br>
+          给自己造一座王宫
+        </h1>
+        <p class="hero-sub" data-reveal>
+          我是 <b>天逸</b>，一名正在学编程的学生。<br>
+          王室的规矩我向来左耳进右耳出，<span class="mark">真正让我着迷的，是那些能把想法立刻变成现实的东西——比如一行能跑起来的代码。</span>
+        </p>
+
+        <p class="typing" data-reveal>
+          <span class="typing-label">此刻我在：</span>
+          <span id="typed" class="typed"></span><span class="caret" aria-hidden="true"></span>
+        </p>
+
+        <div class="hero-actions" data-reveal>
+          <a class="btn btn-primary" href="#works">
+            <span>看看我的项目</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/hagxybu123" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.93.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
+            <span>GitHub 主页</span>
+          </a>
+        </div>
+
+        <ul class="hero-stats" data-reveal>
+          <li><b data-count="1">0</b><span>枚星庭居民</span></li>
+          <li><b data-count="2">0</b><span>个已上线项目</span></li>
+          <li><b data-count="100" data-suffix="+">0</b><span>次提交练习</span></li>
+          <li><b data-count="1" data-suffix=" 座">0</b><span>正在建造的王宫</span></li>
+        </ul>
+      </div>
+
+      <div class="hero-card" data-reveal data-tilt>
+        <div class="card-glow" aria-hidden="true"></div>
+        <img class="portrait" src="assets/img/portrait.jpg" alt="天逸的角色形象：宝蓝丝绒长裙与白色蕾丝的王室少女" loading="lazy" decoding="async">
+        <div class="hero-card-body">
+          <div class="chip-row">
+            <span class="chip">狮子座</span>
+            <span class="chip">INTP</span>
+            <span class="chip">Python 学习中</span>
+          </div>
+          <p class="quote">“规矩是死的，人是活的。”</p>
+          <p class="quote-note">——所以我把规矩写成了可以随时改的代码</p>
+        </div>
+      </div>
+    </div>
+
+    <a class="scroll-hint" href="#about" aria-label="向下浏览">
+      <span></span>
+    </a>
+  </section>
+
+  <!-- ============================== ABOUT ============================== -->
+  <section class="section" id="about">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">01 / 关于我</p>
+        <h2 class="section-title">一边学着做个合格的 <em>学生</em>，<br>一边偷偷研究怎么让机器听话</h2>
+      </header>
+
+      <div class="about-grid">
+        <div class="about-text" data-reveal>
+          <p>
+            我叫 <b>天逸</b>。名字里的“逸”取的是“逃逸”的意思——逃出按部就班的剧本，去试试那些没人替我安排好的事。
+            编程对我来说就是这样的出口：<b>它不看你出身，只看你想清楚没有。</b>
+          </p>
+          <p>
+            现在我在读 <span class="ph" title="占位内容，可替换为你的学校与专业">XX 学校 · XX 专业</span>，
+            主要自学 <b>Python</b>，同时喜欢把学到的东西做成看得见的小网页。
+            我最享受的时刻不是“写完了”，而是“报错了，但我知道为什么”。
+          </p>
+          <p>
+            性格上属于那种嘴上嫌弃、手里却会偷偷帮忙的类型。做项目也一样：
+            平时看起来慢慢吞吞，一旦决定要做，就会一直折腾到它能被别人打开的那一刻。
+          </p>
+
+          <div class="info-list">
+            <div class="info-item"><span>坐标</span><b>地球 · 有网的地方</b></div>
+            <div class="info-item"><span>主修方向</span><b>Python / Web 前端</b></div>
+            <div class="info-item"><span>正在学</span><b>HTML · CSS · JavaScript</b></div>
+            <div class="info-item"><span>邮箱</span><b class="ph" title="占位内容，可替换为你的邮箱">your-mail@example.com</b></div>
+          </div>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#guestbook">
+              <span>给我留句话</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+            <a class="btn btn-ghost" href="#journey"><span>看看我的星轨</span></a>
+          </div>
+        </div>
+
+        <aside class="about-aside" data-reveal>
+          <div class="panel">
+            <h3 class="panel-title">角色设定 · 三次元版</h3>
+            <ul class="trait-list">
+              <li>
+                <b>典型经历</b>
+                <p>从"我想做个网站"开始，第一版简陋到自己都不好意思给别人看，于是推翻重做。</p>
+              </li>
+              <li>
+                <b>内在冲突</b>
+                <p>想要一步做出好看的东西，又清楚只能从打印一行 <code>print("hello")</code> 开始。</p>
+              </li>
+              <li>
+                <b>性格特质</b>
+                <p>对未知的好奇心过剩，说话有点毒舌，实际会把每个报错都截图存下来复盘。</p>
+              </li>
+              <li>
+                <b>核心执念</b>
+                <p>比起漂亮话，更在意"这个东西真的能跑起来吗"。</p>
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== SKILLS ============================== -->
+  <section class="section" id="skills">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">02 / 技能星图</p>
+        <h2 class="section-title">还在点亮的 <em>星点</em></h2>
+        <p class="section-lead">下面这些是我目前真实在用的东西。进度条不是炫耀，是提醒自己还有多长路要走。</p>
+      </header>
+
+      <div class="skill-grid">
+        <div class="panel skill-panel" data-reveal>
+          <div class="skill" data-level="72">
+            <div class="skill-top"><b>Python</b><span>能读懂报错，也能自己修</span></div>
+            <div class="bar"><i></i></div>
+          </div>
+          <div class="skill" data-level="58">
+            <div class="skill-top"><b>HTML</b><span>结构写得清楚，语义标签在用</span></div>
+            <div class="bar"><i></i></div>
+          </div>
+          <div class="skill" data-level="52">
+            <div class="skill-top"><b>CSS</b><span>布局与动画，正在研究响应式</span></div>
+            <div class="bar"><i></i></div>
+          </div>
+          <div class="skill" data-level="38">
+            <div class="skill-top"><b>JavaScript</b><span>会写交互，还在补基础</span></div>
+            <div class="bar"><i></i></div>
+          </div>
+          <div class="skill" data-level="30">
+            <div class="skill-top"><b>Git / GitHub</b><span>会提交、会部署 Pages</span></div>
+            <div class="bar"><i></i></div>
+          </div>
+        </div>
+
+        <div class="tool-grid">
+          <div class="panel tool-card" data-reveal>
+            <h3 class="panel-title">工具箱</h3>
+            <div class="chip-row">
+              <span class="chip">VS Code</span>
+              <span class="chip">Python 3</span>
+              <span class="chip">GitHub Pages</span>
+              <span class="chip">命令行</span>
+              <span class="chip">AI 助手</span>
+              <span class="chip">Markdown</span>
+            </div>
+          </div>
+          <div class="panel tool-card" data-reveal>
+            <h3 class="panel-title">正在攻克的</h3>
+            <ul class="check-list">
+              <li>JavaScript 异步与 DOM 事件</li>
+              <li>把 Python 脚本打包成能给别人用的东西</li>
+              <li>让网页在手机上也不难看</li>
+              <li>把想法一次性写完再改，而不是边写边推翻</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== WORKS ============================== -->
+  <section class="section" id="works">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">03 / 魔法项目</p>
+        <h2 class="section-title">已经跑起来的 <em>代码魔法</em></h2>
+        <p class="section-lead">每个项目都留了源码入口。点进去看到的报错和注释，都是我真实的痕迹。</p>
+      </header>
+
+      <div class="work-grid">
+        <article class="work-card" data-reveal>
+          <div class="work-top">
+            <span class="work-tag">Python</span>
+            <span class="work-status live">已上线</span>
+          </div>
+          <h3>猜数字小游戏</h3>
+          <p>程序随机生成 1~100 的整数，玩家反复猜测，程序提示偏大或偏小，直到猜中并统计次数。我的第一个完整可运行项目，也是我学会处理非法输入的地方。</p>
+          <ul class="work-meta">
+            <li>random 随机数</li>
+            <li>while 循环</li>
+            <li>try / except 异常处理</li>
+          </ul>
+          <a class="work-link" href="https://github.com/hagxybu123/guess-number-game" target="_blank" rel="noopener">
+            查看源码
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+          </a>
+        </article>
+
+        <article class="work-card" data-reveal>
+          <div class="work-top">
+            <span class="work-tag">HTML / CSS / JS</span>
+            <span class="work-status live">就在你眼前</span>
+          </div>
+          <h3>天逸 · 星庭（本站）</h3>
+          <p>从一张空白页面开始亲手搭的个人主页：深空星云背景、滚动叙事、留言板、亮暗主题切换。设计稿改了三版，第一版太像模板，于是全部推翻重来。</p>
+          <ul class="work-meta">
+            <li>响应式布局</li>
+            <li>Canvas 星野</li>
+            <li>IntersectionObserver 动效</li>
+          </ul>
+          <a class="work-link" href="https://github.com/hagxybu123" target="_blank" rel="noopener">
+            查看源码
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
+          </a>
+        </article>
+
+        <article class="work-card is-ghost" data-reveal>
+          <div class="work-top">
+            <span class="work-tag">下一个</span>
+            <span class="work-status">筹划中</span>
+          </div>
+          <h3>这里留给下一个想法</h3>
+          <p>可能是把 Python 脚本做成带界面的小工具，也可能是继续折腾这个星庭。等它真的跑起来，我会把它放上来。</p>
+          <ul class="work-meta">
+            <li>正在选题</li>
+            <li>欢迎催更</li>
+          </ul>
+          <a class="work-link" href="#guestbook">给我个建议
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== JOURNEY ============================== -->
+  <section class="section" id="journey">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">04 / 星轨</p>
+        <h2 class="section-title">一路留下的 <em>脚印</em></h2>
+      </header>
+
+      <ol class="timeline">
+        <li data-reveal>
+          <span class="tl-dot" aria-hidden="true"></span>
+          <div class="tl-card">
+            <span class="tl-time">起点</span>
+            <h3>第一次让程序替我做事</h3>
+            <p>写下第一段 Python，看着终端里跳出结果，第一次觉得"原来我也能让机器听我的话"。</p>
+          </div>
+        </li>
+        <li data-reveal>
+          <span class="tl-dot" aria-hidden="true"></span>
+          <div class="tl-card">
+            <span class="tl-time">第一次完整项目</span>
+            <h3>猜数字小游戏上线 GitHub</h3>
+            <p>从"能跑"到"别人 clone 下来也能跑"，学会了整理文件和写 README。</p>
+          </div>
+        </li>
+        <li data-reveal>
+          <span class="tl-dot" aria-hidden="true"></span>
+          <div class="tl-card">
+            <span class="tl-time">转折点</span>
+            <h3>做了一版很简陋的个人主页</h3>
+            <p>那时候只有几个页面和一段能提交的留言表单，样式几乎是空的。它不好看，但它是我第一次把想法放上互联网。</p>
+          </div>
+        </li>
+        <li data-reveal class="is-now">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <div class="tl-card">
+            <span class="tl-time">现在</span>
+            <h3>推翻重做，于是有了这座星庭</h3>
+            <p>重新设计视觉、重写结构、补上动效与响应式，并用 GitHub Pages 部署到互联网上——也就是你正在看的这一页。</p>
+          </div>
+        </li>
+        <li data-reveal>
+          <span class="tl-dot" aria-hidden="true"></span>
+          <div class="tl-card">
+            <span class="tl-time">下一步</span>
+            <h3>把好奇心继续往下挖</h3>
+            <p>深入 JavaScript、接触后端与数据，试着做一个真的有别人在用的东西。</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============================== GUESTBOOK ============================== -->
+  <section class="section section-guestbook" id="guestbook">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">05 / 星简留言</p>
+        <h2 class="section-title">写下一句，让星庭 <em>记住你</em></h2>
+        <p class="section-lead">留言会立刻出现在下面（保存在你自己的浏览器里）。想让我真的看到，也可以直接发到我的邮箱。</p>
+      </header>
+
+      <div class="guest-grid">
+        <form class="panel guest-form" id="msgForm" novalidate data-reveal>
+          <label for="gName">你的称呼</label>
+          <input id="gName" name="name" type="text" maxlength="20" placeholder="怎么称呼你？" autocomplete="name" required>
+
+          <label for="gMsg">想说的话</label>
+          <textarea id="gMsg" name="message" rows="5" maxlength="300" placeholder="至少写 4 个字，我会认真看。" required></textarea>
+
+          <div class="form-foot">
+            <span class="counter"><b id="counter">0</b>/300</span>
+            <button class="btn btn-primary" type="submit">
+              <span>封存这枚星简</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5L4 12Z"/></svg>
+            </button>
+          </div>
+          <p class="form-tip" id="formTip" role="status" aria-live="polite"></p>
+        </form>
+
+        <div class="panel guest-list-panel" data-reveal>
+          <div class="guest-list-head">
+            <h3 class="panel-title">星简墙</h3>
+            <button id="clearMsgs" class="text-btn" type="button">清空我本地的留言</button>
+          </div>
+          <ul class="guest-list" id="guestList"></ul>
+          <p class="empty-hint" id="emptyHint">还没有留言。你可以成为第一个在星庭留下名字的人 ✦</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== CONTACT ============================== -->
+  <section class="section section-contact" id="contact">
+    <div class="wrap">
+      <div class="contact panel" data-reveal>
+        <div>
+          <p class="kicker">06 / 找到我</p>
+          <h2 class="section-title">星庭的门，一直开着</h2>
+          <p class="section-lead">想聊代码、想指出这一页的毛病，或者只是想认识一下，都可以从这里找我。</p>
+        </div>
+        <div class="contact-links">
+          <a class="contact-item" href="https://github.com/hagxybu123" target="_blank" rel="noopener">
+            <b>GitHub</b><span>@hagxybu123</span>
+          </a>
+          <a class="contact-item ph" href="mailto:your-mail@example.com" title="占位内容，可替换为你的邮箱">
+            <b>邮箱</b><span>your-mail@example.com</span>
+          </a>
+          <a class="contact-item" href="#guestbook">
+            <b>留言板</b><span>写一句话就走</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div>
+      <p class="footer-logo">天逸 · 星庭</p>
+      <p class="footer-note">星光不息，代码不止 ✦</p>
+    </div>
+    <p class="footer-meta">
+      © <span id="year">2025</span> 天逸 · 用 HTML / CSS / JavaScript 手写 · 部署于 GitHub Pages
+    </p>
+  </div>
+</footer>
+
+<button id="toTop" class="to-top" type="button" aria-label="回到顶部">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+</button>
+
+<script src="assets/js/main.js" defer></script>
+</body>
+</html>
