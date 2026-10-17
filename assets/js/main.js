@@ -1168,6 +1168,341 @@
     paint(false);
   }
 
+  /* --------------------------------------------------- AI 形象互动（本地角色）
+     说明：静态站无法安全持有大模型 API Key（会被前端泄露），所以这里是一个
+     由「性格 + 话题」驱动的本地对话引擎。她的语气取自角色设定：
+     王室少女、狮子座、INTP、口头禅"规矩是死的，人是活的"、嘴硬心软、爱吃甜食。 */
+  function initAI() {
+    var dock = $('#aiDock');
+    var panel = $('#aiPanel');
+    var launcher = $('#aiLauncher');
+    var closeBtn = $('#aiClose');
+    var log = $('#aiLog');
+    var form = $('#aiForm');
+    var input = $('#aiInput');
+    var chips = $('#aiChips');
+    var status = $('#aiStatus');
+    if (!dock || !panel || !log || !form || !input) return;
+
+    var PICK = function (arr) { return arr[Math.floor(Math.random() * arr.length)]; };
+
+    /* ---- 话题库：keywords 命中越多分越高，回复随机取一条 ---- */
+    var TOPICS = [
+      {
+        id: 'greet', chips: '你好',
+        keywords: ['你好', '您好', 'hi', 'hello', '在吗', '在么', '嗨', '哈喽'],
+        replies: [
+          '嗯，来了。……别误会，我只是刚好没在忙。',
+          '你来了。星庭今天很安静，正好缺个说话的人。',
+          '哟，稀客。说吧，想聊什么？我可是很挑话题的。'
+        ]
+      },
+      {
+        id: 'who', chips: '你是谁',
+        keywords: ['你是谁', '你叫什么', '自我介绍', '介绍一下你', '什么角色', '你是'],
+        replies: [
+          '天逸。王室的……算了，这个头衔挺沉的。你叫我天逸就好。',
+          '"逸"取的是"逃逸"的意思——从被安排好的剧本里逃出来。听懂了吗？',
+          '名字里的"逸"是逃逸的逸。规矩是死的，人是活的，那么守规矩有意思吗？'
+        ]
+      },
+      {
+        id: 'creator', chips: '天逸是谁做的',
+        keywords: ['谁做的', '谁创', '作者', '站长', '本人', '你真的', '谁写', '原型'],
+        replies: [
+          '我是他自己写出来的。设定、脾气、连这句嘴硬都是。……有点奇怪吧？我也这么觉得。',
+          '严格说，我是他的一部分。他把不好意思直说的话，都交给我说了。',
+          '是他做的。不过配色是他自己挑的——宝蓝、冰蓝、白蕾丝，全是他喜欢的样子。'
+        ]
+      },
+      {
+        id: 'code', chips: '会写代码吗',
+        keywords: ['代码', '编程', 'python', '写程序', '程序', '会不会写', 'js', '前端'],
+        replies: [
+          '他写，我在旁边看。Python 那个猜数字小游戏，我看了三遍才忍住没吐槽变量名。',
+          '会一点。但说实话，我更擅长挑毛病——比如"你这函数是不是该拆一下"。',
+          '代码这事，他比我认真。他有个习惯：报错了不慌，先弄明白为什么。这点我认。'
+        ]
+      },
+      {
+        id: 'site', chips: '这网站怎么做的',
+        keywords: ['网站', '这个页面', '网页', '站点', '怎么做的', '做的'],
+        replies: [
+          '手写的。HTML、CSS、JavaScript，没有框架，没有模板。他说"得是自己能讲清楚的东西"。',
+          '从头做了一遍。第一版简陋到他不好意思给别人看，于是推翻重来——才有现在的星庭。',
+          '你点一下空白处试试，会炸开星环。这个是他折腾了很久才满意的。'
+        ]
+      },
+      {
+        id: 'stars', chips: '星星是你加的吗',
+        keywords: ['星星', '星空', '星环', '流星', '彗星', '点一下'],
+        replies: [
+          '嗯。他为了这些星星熬到很晚，还专门修过一次"看起来不动"的毛病。',
+          '星星是真的——背景那张是 NASA 拍的。上面飘的这些才是他画的。',
+          '随手点一下页面，会有星环炸开。他说这是给路过的人准备的小礼物。'
+        ]
+      },
+      {
+        id: 'chess', chips: '你下棋怎么样',
+        keywords: ['棋', '象棋', '围棋', '下棋', '棋艺'],
+        replies: [
+          '落子前先算后面三步——这是他写在页面上的话，也是他真正在做的事。',
+          '他下棋很稳。输了不急着翻盘，先复盘。这点比大多数人强。',
+          '急的人先输。这句话他吃过亏才写下来的。'
+        ]
+      },
+      {
+        id: 'game', chips: '玩什么游戏',
+        keywords: ['游戏', '打游戏', '玩什么', 'steam', '策略'],
+        replies: [
+          '策略类。一局能琢磨一晚上，反复想"要是当时换一步会怎样"。',
+          '他玩得很慢，慢到别人都以为他在挂机。其实是在算。',
+          '玩着玩着就开始好奇"这东西怎么做出来的"——后来就有了这一页。'
+        ]
+      },
+      {
+        id: 'dress', chips: '听说你喜欢女装？',
+        keywords: ['女装', '裙子', '穿搭', '蕾丝', '版型'],
+        replies: [
+          '喜欢。这不是什么需要解释的事——好看的东西不该分性别。',
+          '版型、配色、蕾丝走向，我研究得挺认真。跟他写代码时一个毛病：细节控。',
+          '穿得开心就是最好的理由。你要问"为什么"，那说明你还没想通。'
+        ]
+      },
+      {
+        id: 'sweet', chips: '你爱吃什么',
+        keywords: ['吃', '甜', '桂花糖', '糖', '点心', '零食', '蜜饯'],
+        replies: [
+          '桂花糖。……不是我想吃，是路上那摊卖得可怜，顺手买的。',
+          '点心。宫里那套规矩太多，摆得再好看也没味道。',
+          '有人问我兜里为什么总揣着糖——我是怕小商贩亏本，懂了没？'
+        ]
+      },
+      {
+        id: 'anime', chips: '洛天依',
+        keywords: ['洛天依', '二次元', '动漫', '番', '天依'],
+        replies: [
+          '洛天依。这一页的宝蓝和冰蓝就是从她那里来的。',
+          '他写了很多遍她的设定，最后把那份审美搬进了这个页面。',
+          '蓝白配色，星空背景——你以为这些是随便挑的？'
+        ]
+      },
+      {
+        id: 'music', chips: '背景音乐是什么',
+        keywords: ['音乐', '歌', 'bgm', '守护', '奥特曼', '听歌'],
+        replies: [
+          '《只想守护你》。点右上角那个唱片图标就能听。',
+          '歌是"只想守护你 ～理纱之歌～"。他挑了很久才定下来。',
+          '有音乐的时候，这片星空会更像真的。你自己听听看。'
+        ]
+      },
+      {
+        id: 'school', chips: '你在哪上学',
+        keywords: ['学校', '大学', '专业', '沈阳', '丹东', '在哪', '哪里人'],
+        replies: [
+          '沈阳理工大学，计算机科学与技术。丹东东港人。',
+          '在沈阳读书，学计算机。你要是也在东北，冬天就知道什么叫"不想出门"。',
+          '坐标辽宁丹东东港。海风很咸，星空倒是很干净。'
+        ]
+      },
+      {
+        id: 'contact', chips: '怎么联系他',
+        keywords: ['联系', '邮箱', 'qq', '微信', '找你', '怎么找'],
+        replies: [
+          '邮箱 747693891@qq.com。他有空都会看。',
+          '"找到我"那一栏里都写着。留言板也行，他认真看的。',
+          'GitHub 是 hagxybu123。偷偷说一句，他挺希望有人来留言的。'
+        ]
+      },
+      {
+        id: 'hobby', chips: '他有什么爱好',
+        keywords: ['爱好', '兴趣', '喜欢做什么', '平时', '嗜好'],
+        replies: [
+          '棋艺、二次元、折腾电脑、女装、打游戏。五个爱好，全写在"关于我"里了。',
+          '下棋和写代码是同一件事——先想清楚，再动手。',
+          '爱好挺杂的。但共同点很明显：都要求他认真对待细节。'
+        ]
+      },
+      {
+        id: 'feel', chips: '你心情怎么样',
+        keywords: ['心情', '开心吗', '难过', '累', '烦', '郁闷', '压力'],
+        replies: [
+          '……还好。你要是也不太顺，那就先坐一会儿，星庭不收门票。',
+          '累了就歇着。他熬夜写这一页的时候，我也这么劝过他，他不听。',
+          '别硬撑着。规矩都能变通，情绪更不用憋着。'
+        ]
+      },
+      {
+        id: 'thanks', chips: '谢谢你',
+        keywords: ['谢谢', '感谢', '多谢', 'thank'],
+        replies: [
+          '……不用谢。别用那种眼神看我，我只是顺手。',
+          '嗯。你能来，他应该会高兴——我才没有替他高兴。',
+          '客气什么。星庭的门一直开着，想来随时来。'
+        ]
+      },
+      {
+        id: 'bye', chips: '我先走了',
+        keywords: ['再见', '拜拜', '走了', '下线', '晚安', 'bye'],
+        replies: [
+          '走吧。……下次记得回来。',
+          '晚安。星光不息，代码不止。',
+          '行。我不送你了——反正我也出不去。'
+        ]
+      },
+      {
+        id: 'praise', chips: '这页面真好看',
+        keywords: ['好看', '漂亮', '厉害', '牛', '强', '喜欢这个', '不错', '惊艳'],
+        replies: [
+          '……哼。他改了很多版才到这一步，别夸得太轻巧。',
+          '这话他听了会装作不在意，然后偷偷记下来。',
+          '眼光不错。不过星星那部分还能更好，他还在调。'
+        ]
+      },
+      {
+        id: 'critic', chips: '有点丑',
+        keywords: ['丑', '难看', '不行', '烂', '差', '垃圾'],
+        replies: [
+          '……说吧，哪里不好。他让我记着，改就是了。',
+          '审美这东西各有各的。但你得说具体点，不然改不了。',
+          '第一版更难看。真的。'
+        ]
+      },
+      {
+        id: 'meaning', chips: '什么是星庭',
+        keywords: ['星庭', '什么意思', '含义', '为什么叫'],
+        replies: [
+          '星庭是我住的地方。他给我造了一座，顺便留了门给路过的人。',
+          '星是星空，庭是庭院。一个人的院子，开着门。',
+          '他名字里有个"逸"，想逃出去；可又造了个庭院，等人进来。矛盾吧？'
+        ]
+      },
+      {
+        id: 'ai', chips: '你是真的 AI 吗',
+        keywords: ['你是ai', '真的ai', '是不是ai', '人工智能', '大模型', '语言模型', 'chatgpt', 'deepseek', '智能', '模型', '机器人'],
+        replies: [
+          '不是。我是他写的一段对话表——性格是真的，脑子是预置的。',
+          '说实话：我是个本地角色，不会真的思考。但他把我的脾气写得很像样。',
+          '静态页面放不下真模型（Key 会被人偷走）。所以你看到的，是他手写的我。'
+        ]
+      }
+    ];
+
+    /* ---- 性格碎片：没命中话题时用 ---- */
+    var FALLBACK = [
+      '嗯……这个我答不上来。换个说法？',
+      '你说的话我记下了。不过这个话题，他可能比我更懂。',
+      '唔。要不你点一下页面空白处，看星星炸开的样子？',
+      '我听不太懂，但我不装懂——这点比他强。',
+      '……你去"关于我"那一栏翻翻？说不定有答案。'
+    ];
+    var PROMPTS = ['那你呢？', '……继续。', '说吧，我在听。'];
+
+    var greeted = false;
+    var history = {};
+
+    function pickReply(text) {
+      // 归一化：去掉所有空白与常见标点，避免"你是真的 AI 吗"这类输入因空格而匹配失败
+      var q = String(text).toLowerCase().replace(/[\s\u3000·・,，.。!！?？~～:：;；'"“”‘’()（）\[\]【】]/g, '');
+      var best = null, bestScore = 0;
+      for (var i = 0; i < TOPICS.length; i++) {
+        var t = TOPICS[i];
+        var score = 0;
+        for (var k = 0; k < t.keywords.length; k++) {
+          if (q.indexOf(String(t.keywords[k]).toLowerCase()) !== -1) score += t.keywords[k].length;
+        }
+        // 同分时越靠前的话题优先（越具体的话题排在越前面），保证结果确定
+        score = score * 100 - i;
+        if (score > bestScore) { bestScore = score; best = t; }
+      }
+      if (!best || bestScore <= 0) return PICK(FALLBACK);
+
+      history[best.id] = (history[best.id] || 0) + 1;
+      var list = best.replies;
+      // 同一话题问到第三次，换一句更"熟"的说法
+      if (history[best.id] >= 3) {
+        return '这个问题你问过 ' + history[best.id] + ' 遍了。……行吧，我再说一次：' + PICK(list);
+      }
+      return PICK(list);
+    }
+
+    function bubble(role, html) {
+      var el = document.createElement('div');
+      el.className = 'ai-msg ' + (role === 'me' ? 'is-me' : 'is-her');
+      if (role === 'me') el.textContent = html;
+      else el.innerHTML = html;
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+      return el;
+    }
+
+    function setStatus(txt, typing) {
+      if (!status) return;
+      status.textContent = txt;
+      status.classList.toggle('is-typing', !!typing);
+    }
+
+    function typingThen(html, delay) {
+      var t = document.createElement('div');
+      t.className = 'ai-msg is-her';
+      t.innerHTML = '<span class="ai-typing"><i></i><i></i><i></i></span>';
+      log.appendChild(t);
+      log.scrollTop = log.scrollHeight;
+      setStatus('正在想…', true);
+      window.setTimeout(function () {
+        if (t.parentNode) t.parentNode.removeChild(t);
+        bubble('her', html);
+        setStatus('在线 · 想聊点什么？', false);
+      }, delay || (420 + Math.random() * 520));
+    }
+
+    function renderChips(list) {
+      if (!chips) return;
+      chips.innerHTML = '';
+      list.forEach(function (label) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = label;
+        b.addEventListener('click', function () { send(label); });
+        chips.appendChild(b);
+      });
+    }
+
+    function send(text) {
+      var msg = String(text || '').trim();
+      if (!msg) return;
+      bubble('me', msg);
+      input.value = '';
+      typingThen(pickReply(msg));
+    }
+
+    function open() {
+      panel.hidden = false;
+      dock.classList.add('is-open');
+      launcher.setAttribute('aria-expanded', 'true');
+      if (!greeted) {
+        greeted = true;
+        typingThen('……你来了。星庭今天没什么人，随便看看吧。<br>想问我什么就问，我不一定答，答了就一定是真的。', 700);
+      }
+      window.setTimeout(function () { try { input.focus(); } catch (e) {} }, 120);
+    }
+
+    function close() {
+      panel.hidden = true;
+      dock.classList.remove('is-open');
+      launcher.setAttribute('aria-expanded', 'false');
+    }
+
+    launcher.addEventListener('click', function () { panel.hidden ? open() : close(); });
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    form.addEventListener('submit', function (e) { e.preventDefault(); send(input.value); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !panel.hidden) close();
+    });
+
+    renderChips(['你是谁', '这网站怎么做的', '听说你喜欢女装？', '你爱吃什么']);
+  }
+
   /* --------------------------------------------------------------- 启动 */
   function boot() {
     // Mark that JS is alive. CSS only hides [data-reveal] elements under
@@ -1185,6 +1520,7 @@
       ['立绘倾斜', initTilt],
       ['留言板', initGuestbook],
       ['背景音乐', initMusic],
+      ['AI 形象互动', initAI],
       ['开场页', initEntry],
       ['进入按钮', initEnterButton]
     ];

@@ -648,6 +648,40 @@
       </div>
     </div>
   </section>
+
+  <!-- ============================== AI 形象互动 ============================== -->
+  <div class="ai-dock" id="aiDock">
+    <button class="ai-launcher" id="aiLauncher" type="button" aria-label="和天逸说说话" aria-expanded="false" aria-controls="aiPanel">
+      <span class="ai-launcher-ring" aria-hidden="true"></span>
+      <img src="assets/img/avatar.png" alt="天逸" width="256" height="256">
+      <span class="ai-badge" aria-hidden="true">✦</span>
+    </button>
+
+    <section class="ai-panel" id="aiPanel" aria-label="天逸 · 对话" hidden>
+      <header class="ai-head">
+        <img src="assets/img/avatar.png" alt="" width="44" height="44">
+        <div class="ai-head-text">
+          <b>天逸</b>
+          <span id="aiStatus">在线 · 想聊点什么？</span>
+        </div>
+        <button class="ai-close" id="aiClose" type="button" aria-label="收起对话">✕</button>
+      </header>
+
+      <div class="ai-log" id="aiLog" role="log" aria-live="polite"></div>
+
+      <div class="ai-chips" id="aiChips"></div>
+
+      <form class="ai-form" id="aiForm">
+        <input id="aiInput" type="text" maxlength="120" placeholder="说点什么…（比如：你是谁 / 会写代码吗）" autocomplete="off" aria-label="输入消息">
+        <button type="submit" aria-label="发送">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5L4 12Z"/></svg>
+        </button>
+      </form>
+      <p class="ai-note">
+        她是个本地角色，回复由预设性格驱动，不是在线大模型。
+      </p>
+    </section>
+  </div>
 </main>
 
 <footer class="site-footer">
