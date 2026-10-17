@@ -607,18 +607,21 @@
       }
 
       // 按住拖动画出的星屑：各自呼吸着淡出
+      // 之前 decay 0.012/帧 -> 1.4 秒就没了，肉眼几乎注意不到（实测拖拽后绘制量只 +15%）。
+      // 现在放慢到约 4~5 秒，并加大光晕，让"星星跟着手走"真的看得见。
       if (trail.length) {
         for (var tr = trail.length - 1; tr >= 0; tr--) {
           var tp = trail[tr];
-          tp.life -= 0.012 * dt;
-          tp.ph += 0.09 * dt;
+          tp.life -= 0.0030 * dt;      // 约 5.5 秒寿命，够看清整条轨迹
+          tp.ph += 0.075 * dt;
           if (tp.life <= 0) { trail.splice(tr, 1); continue; }
-          var breath = 0.72 + 0.28 * Math.sin(tp.ph);
+          var breath = 0.66 + 0.34 * Math.sin(tp.ph);
           var talpha = tp.life * breath;
-          halo(palette(tp.hue), tp.x, tp.y, tp.r * 7, talpha * 0.6);
-          ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, talpha * 1.3).toFixed(3) + ')';
+          halo(palette(tp.hue), tp.x, tp.y, tp.r * 12, talpha * 1.35);
+          halo('255, 255, 255', tp.x, tp.y, tp.r * 4.2, talpha * 1.0);
+          ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.min(1, talpha * 1.5).toFixed(3) + ')';
           ctx.beginPath();
-          ctx.arc(tp.x, tp.y, tp.r * 0.42 * tp.life + 0.5, 0, Math.PI * 2);
+          ctx.arc(tp.x, tp.y, tp.r * 0.58 * tp.life + 1.1, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -662,15 +665,17 @@
     window.addEventListener('pointermove', function (e) {
       if (!painting) return;
       var now = performance.now();
-      if (now - lastPaint < 26) return;      // 限流：最多约每 26ms 落一颗，防刷爆
+      if (now - lastPaint < 16) return;      // 限流：最多约每 16ms 落一颗
       lastPaint = now;
-      if (trail.length > 150) trail.shift();
+      // 上限保护：满了就不再新增（不用 shift 淘汰，避免把刚拖出的痕抹掉）
+      if (trail.length >= 260) return;
       trail.push({
         x: e.clientX, y: e.clientY,
         life: 1,
-        r: rnd(2.2, 5.4),
+        // 起点更大更亮，肉眼才看得出"星星跟着手走"
+        r: rnd(4.4, 10.0),
         ph: Math.random() * Math.PI * 2,
-        hue: Math.random() > 0.55 ? 'gold' : (Math.random() > 0.4 ? 'ice' : 'violet')
+        hue: Math.random() > 0.5 ? 'gold' : (Math.random() > 0.35 ? 'ice' : 'violet')
       });
     }, { passive: true });
     document.addEventListener('visibilitychange', function () {
