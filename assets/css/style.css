@@ -2555,3 +2555,34 @@ html:not(.use-css-stars) .css-stars * {
 @media (max-width: 560px) {
   .inline-play-frame { aspect-ratio: 3 / 4; }
 }
+
+/* ---------------------------------------------------------------- 调试标记
+   左下角的版本/探针标记只在 URL 带 ?debug 时显示（例如
+   https://hagxybu123.github.io/?debug）。
+   为什么：这些是开发期排障用的信息，普通访客看到
+   "已切换到 CSS 星层（最亮仅 0/255）" 这类文案会以为网站坏了。
+   需要排障时加 ?debug 即可，功能完全不变。 */
+.build-stamp,
+.build-tag { display: none !important; }
+
+html.is-debug .build-stamp {
+  display: inline-block !important;
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 150;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 215, 155, .55);
+  background: rgba(10, 16, 40, .9);
+  color: #f2d79b;
+  font-size: .7rem;
+  letter-spacing: .06em;
+  pointer-events: none;
+  max-width: 92vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.is-debug .build-tag { display: inline-block !important; }

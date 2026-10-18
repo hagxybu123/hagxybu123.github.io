@@ -20,6 +20,21 @@
   /* 注意用 typeof 判断：直接写 navigator 在缺少该全局的对象里会抛
      ReferenceError（连 && 短路都救不了，因为标识符解析阶段就失败）。 */
   var ua = (typeof navigator !== 'undefined' && navigator && navigator.userAgent) || '';
+
+  /* 调试模式：URL 带 ?debug 时才把版本/探针信息显示出来。
+     这些是排障用的信息，普通访客看到会误以为网站出问题 ——
+     所以默认完全隐藏，需要时自己加 ?debug。 */
+  var DEBUG = (function () {
+    try {
+      var q = String((typeof location !== 'undefined' && location.search) || '');
+      var h = String((typeof location !== 'undefined' && location.hash) || '');
+      if (/[?&]debug\b/i.test(q) || /(^|[#&])debug\b/i.test(h)) {
+        document.documentElement.classList.add('is-debug');
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  })();
   var isX5 = /MQQBrowser|QQBrowser|QQ\/|TBS\/|X5JSCore/i.test(ua);
 
   // 共用的随机数工具（星野与开场页漩涡都要用）
@@ -33,6 +48,10 @@
   var skyNotes = [];
   function skyNote(msg) {
     skyNotes.push(msg);
+    /* 只有调试模式才把信息写到页面上。
+       普通访客看到"已切换到 CSS 星层（最亮仅 0/255）"这类排障文案
+       会误以为网站坏了 —— 这些信息只该在 ?debug 时出现。 */
+    if (!DEBUG) return;
     try {
       var st = document.getElementById('buildStamp');
       if (st) st.textContent = 'v9 · 2026-10-17 · ⚠ ' + msg;
@@ -1617,11 +1636,14 @@
       var cv = $('#sky');
       if (cv) cv.style.display = 'none';
       var note = '已切换到 CSS 星层（' + reason + '）';
-      var stamp = $('#buildStamp');
-      if (stamp) stamp.textContent = 'v9 · 2026-10-17 · ' + note;
-      var tag = document.querySelector ? document.querySelector('.build-tag') : null;
-      if (tag) tag.textContent = 'v9 · 2026-10-17 · ' + note;
-      document.title = '天逸 · 星庭 [v9] · ' + note;
+      if (DEBUG) {
+        /* 版本标记与标题里的探针信息也只在调试模式写 */
+        var stamp = $('#buildStamp');
+        if (stamp) stamp.textContent = 'v9 · 2026-10-17 · ' + note;
+        var tag = document.querySelector ? document.querySelector('.build-tag') : null;
+        if (tag) tag.textContent = 'v9 · 2026-10-17 · ' + note;
+        document.title = '天逸 · 星庭 [v9] · ' + note;
+      }
       if (window.console && console.info) console.info('[星庭] ' + note);
     } catch (e) {}
   }
@@ -2661,16 +2683,17 @@
             return;   // 标记与标题已由 enableCssSky 写好
           }
 
-          var parts = ['v9 · 2026-10-17'];
-          if (isX5) parts.push('已识别 QQ/X5 内核，开场动画走纯 CSS');
-          if (reduceMotion) parts.push('⚠ 系统开启了"减少动态效果"，动画已停用');
-          else parts.push('动画已启动');
-          parts.push(chk.note);
-          if (skyNotes.length) parts.push(skyNotes.join('；'));
-          var line = parts.join(' · ');
-          if (stamp) stamp.textContent = line;
-          if (tag) tag.textContent = line;
-          document.title = '天逸 · 星庭 [v9] · ' + chk.note;
+          if (!DEBUG) return;   // 非调试模式：不写标记、不改标题
+            var parts = ['v9 · 2026-10-17'];
+            if (isX5) parts.push('已识别 QQ/X5 内核，开场动画走纯 CSS');
+            if (reduceMotion) parts.push('⚠ 系统开启了"减少动态效果"，动画已停用');
+            else parts.push('动画已启动');
+            parts.push(chk.note);
+            if (skyNotes.length) parts.push(skyNotes.join('；'));
+            var line = parts.join(' · ');
+            if (stamp) stamp.textContent = line;
+            if (tag) tag.textContent = line;
+            document.title = '天逸 · 星庭 [v9] · ' + chk.note;
         } catch (e) {}
       }, 900);
     } catch (e) {}

@@ -1,0 +1,6 @@
+# 天逸 · 星庭 —— 允许所有搜索引擎收录
+User-agent: *
+Allow: /
+
+# 站点地图
+Sitemap: https://hagxybu123.github.io/sitemap.xml
