@@ -19,7 +19,7 @@
 <link rel="icon" href="assets/img/avatar.png" type="image/png">
 <link rel="apple-touch-icon" href="assets/img/avatar.png">
 <link rel="preload" as="image" href="assets/img/hero.jpg" fetchpriority="high">
-<link rel="stylesheet" href="assets/css/style.css?v=20261017l">
+<link rel="stylesheet" href="assets/css/style.css?v=20261017m">
 <noscript>
   <style>
     /* 脚本被禁用时，页面依然完整可读 */
@@ -435,6 +435,18 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>
             </a>
           </div>
+        
+          <!-- 内联试玩：点击后才加载 iframe，完全隔离，不影响主页性能与样式 -->
+          <div class="inline-play">
+            <button class="inline-play-toggle" type="button" aria-expanded="false" aria-controls="gameFrameWrap">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5Z"/></svg>
+              直接在这里玩
+            </button>
+            <div class="inline-play-frame" id="gameFrameWrap" hidden>
+              <iframe id="gameFrame" title="猜数字小游戏" loading="lazy"
+                      referrerpolicy="no-referrer" data-src="https://hagxybu123.github.io/guess-number-game/"></iframe>
+            </div>
+          </div>
         </article>
 
         <article class="work-card" data-reveal>
@@ -722,6 +734,6 @@
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
 </button>
 
-<script src="assets/js/main.js?v=20261017l" defer></script>
+<script src="assets/js/main.js?v=20261017m" defer></script>
 </body>
 </html>

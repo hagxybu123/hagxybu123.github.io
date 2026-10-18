@@ -2494,3 +2494,64 @@ html:not(.use-css-stars) .css-stars * {
   background: rgba(242, 215, 155, .2);
   border-color: rgba(242, 215, 155, .7);
 }
+
+/* ---------------------------------------------------------------- 内联试玩
+   作品卡里"直接在这里玩"的面板。
+   设计取舍：用 iframe 而不是把游戏代码内联进主页 ——
+   主页的星空/AI/留言板共用全局作用域，游戏又有自己的全屏背景与样式，
+   直接内联会互相污染；iframe 完全隔离，且游戏页出错也不会影响主页。
+   iframe 只在用户点击后才真正加载（data-src -> src），首屏不多下载一个字节。 */
+.inline-play { margin-top: 14px; }
+
+.inline-play-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px dashed var(--glass-bd-strong);
+  background: rgba(120, 160, 255, .07);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+  transition: color .25s, border-color .25s, background .25s;
+}
+
+.inline-play-toggle:hover {
+  color: var(--ice-200);
+  border-color: rgba(150, 185, 255, .55);
+  background: rgba(120, 160, 255, .13);
+}
+
+.inline-play-toggle svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  flex: none;
+}
+
+.inline-play-toggle[aria-expanded="true"] svg { transform: scaleX(-1); }
+
+/* 展开后的容器：给一个固定的宽高比，避免加载瞬间的尺寸跳动 */
+.inline-play-frame {
+  margin-top: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--glass-bd);
+  background: #070b1c;
+  /* 用 aspect-ratio 预留高度，iframe 加载时不会把下面的内容顶来顶去 */
+  aspect-ratio: 4 / 5;
+  max-height: 620px;
+}
+
+.inline-play-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+@media (max-width: 560px) {
+  .inline-play-frame { aspect-ratio: 3 / 4; }
+}

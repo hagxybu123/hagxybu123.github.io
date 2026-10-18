@@ -2096,6 +2096,50 @@
   }
 
   /* --------------------------------------------------- 首屏「进入星庭」按钮 */
+  /* ------------------------------------------------------------------ 内联试玩
+     作品卡里的「直接在这里玩」面板。
+     实现要点：
+       · iframe 地址先放在 data-src，点击展开时才赋给 src ——
+         首屏不会额外下载游戏页，也不会影响主页的星野动画
+       · 用 iframe 而不是内联游戏代码：主页各模块共用全局作用域，
+         游戏又有自己的全屏背景与样式，直接内联会互相污染；
+         iframe 完全隔离，游戏页出问题也绝不会影响主页
+       · 只展开一个，避免多个 iframe 同时运行 */
+  function initInlinePlay() {
+    var toggles = $$('.inline-play-toggle');   // 两个 $ = querySelectorAll，返回数组
+    if (!toggles.length) return;
+
+    toggles.forEach(function (btn) {
+      var wrapId = btn.getAttribute('aria-controls');
+      var wrap = wrapId ? document.getElementById(wrapId) : null;
+      if (!wrap) return;
+      var frame = wrap.querySelector('iframe');
+
+      btn.addEventListener('click', function () {
+        var open = btn.getAttribute('aria-expanded') === 'true';
+        if (open) {
+          // 收起：保留已加载的 iframe，这样再次展开时不用重新加载
+          btn.setAttribute('aria-expanded', 'false');
+          wrap.hidden = true;
+          return;
+        }
+
+        // 展开：若是首次，此时才真正加载
+        if (frame && !frame.getAttribute('src')) {
+          var src = frame.getAttribute('data-src');
+          if (src) frame.setAttribute('src', src);
+        }
+        btn.setAttribute('aria-expanded', 'true');
+        wrap.hidden = false;
+
+        // 展开后滚到可视区，避免用户还得自己往下找
+        try {
+          wrap.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+        } catch (e) {}
+      });
+    });
+  }
+
   function initEnterButton() {
     var btn = $('#enterBtn');
     if (!btn) return;
@@ -2581,7 +2625,8 @@
       ['背景音乐', initMusic],
       ['AI 形象互动', initAI],
       ['开场页', initEntry],
-      ['进入按钮', initEnterButton]
+      ['进入按钮', initEnterButton],
+      ['内联试玩', initInlinePlay]
     ];
 
     for (var i = 0; i < steps.length; i++) {
