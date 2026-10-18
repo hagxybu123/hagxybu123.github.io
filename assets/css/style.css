@@ -2467,3 +2467,30 @@ html:not(.use-css-stars) .css-stars * {
 @media (prefers-reduced-motion: reduce) {
   .cte-dots, .cte-core, .cte-wave { animation: none; opacity: 0; }
 }
+
+/* 作品卡底部的多个链接（如「在线试玩」+「查看源码」）
+   用 flex 横排，窄屏自动换行；主链接用金色区分。
+   过渡属性只包含 gap / color，不涉及布局属性动画，不会引发闪烁。 */
+.work-links {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+}
+
+.work-links .work-link { margin-top: 0; }
+
+.work-link.is-primary {
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 215, 155, .45);
+  background: rgba(242, 215, 155, .12);
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.work-link.is-primary:hover {
+  background: rgba(242, 215, 155, .2);
+  border-color: rgba(242, 215, 155, .7);
+}
