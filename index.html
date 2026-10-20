@@ -23,7 +23,7 @@
 <link rel="icon" href="assets/img/avatar.png" type="image/png">
 <link rel="apple-touch-icon" href="assets/img/avatar.png">
 <link rel="preload" as="image" href="assets/img/hero.jpg" fetchpriority="high">
-<link rel="stylesheet" href="assets/css/style.css?v=20261018b">
+<link rel="stylesheet" href="assets/css/style.css?v=20261018c">
 <noscript>
   <style>
     /* 脚本被禁用时，页面依然完整可读 */
@@ -505,8 +505,14 @@
         <h2 class="section-title">一路留下的 <em>脚印</em></h2>
       </header>
 
-      <ol class="timeline">
-        <li data-reveal>
+      <div class="tl-meter" data-reveal>
+          <p class="tl-meter-num"><b id="tlCount">0</b><span> / <span id="tlTotal">7</span> 已点亮</span></p>
+          <p class="tl-meter-hint" id="tlHint">点一下节点，把走过的路点亮</p>
+          <button class="text-btn tl-meter-reset" id="tlReset" type="button">全部熄灭</button>
+        </div>
+
+        <ol class="timeline" id="timeline">
+        <li class="tl-item" data-reveal tabindex="0" role="button" aria-pressed="false">
           <span class="tl-dot" aria-hidden="true"></span>
           <div class="tl-card">
             <span class="tl-time">更早之前</span>
@@ -514,7 +520,7 @@
             <p>在接触代码之前，先被那个蓝白色的身影和"把虚拟唱成真的"这件事吸引。后来我才发现，做编程其实是同一件事：让想象里的东西真的存在。</p>
           </div>
         </li>
-        <li data-reveal>
+        <li class="tl-item" data-reveal tabindex="0" role="button" aria-pressed="false">
           <span class="tl-dot" aria-hidden="true"></span>
           <div class="tl-card">
             <span class="tl-time">埋下种子</span>
@@ -522,7 +528,7 @@
             <p>打策略游戏打久了，开始不满足于"玩得好"，而是好奇规则背后是怎么被设计出来的。那个好奇一直放着，直到后来变成"要不我自己写一个"。</p>
           </div>
         </li>
-        <li data-reveal>
+        <li class="tl-item" data-reveal tabindex="0" role="button" aria-pressed="false">
           <span class="tl-dot" aria-hidden="true"></span>
           <div class="tl-card">
             <span class="tl-time">起点</span>
@@ -530,7 +536,7 @@
             <p>写下第一段 Python，看着终端里跳出结果，第一次觉得"原来我也能让机器听我的话"。</p>
           </div>
         </li>
-        <li data-reveal>
+        <li class="tl-item" data-reveal tabindex="0" role="button" aria-pressed="false">
           <span class="tl-dot" aria-hidden="true"></span>
           <div class="tl-card">
             <span class="tl-time">第一次完整项目</span>
@@ -538,7 +544,7 @@
             <p>从"能跑"到"别人 clone 下来也能跑"，学会了整理文件和写 README。</p>
           </div>
         </li>
-        <li data-reveal>
+        <li class="tl-item" data-reveal tabindex="0" role="button" aria-pressed="false">
           <span class="tl-dot" aria-hidden="true"></span>
           <div class="tl-card">
             <span class="tl-time">转折点</span>
@@ -546,7 +552,7 @@
             <p>那时候只有几个页面和一段能提交的留言表单，样式几乎是空的。它不好看，但它是我第一次把想法放上互联网。</p>
           </div>
         </li>
-        <li data-reveal class="is-now">
+        <li class="tl-item is-now" data-reveal tabindex="0" role="button" aria-pressed="false">
           <span class="tl-dot" aria-hidden="true"></span>
           <div class="tl-card">
             <span class="tl-time">现在</span>
@@ -554,7 +560,7 @@
             <p>重新设计视觉、重写结构、补上动效与响应式，并用 GitHub Pages 部署到互联网上——也就是你正在看的这一页。</p>
           </div>
         </li>
-        <li data-reveal>
+        <li class="tl-item" data-reveal tabindex="0" role="button" aria-pressed="false">
           <span class="tl-dot" aria-hidden="true"></span>
           <div class="tl-card">
             <span class="tl-time">下一步</span>
@@ -745,6 +751,6 @@
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
 </button>
 
-<script src="assets/js/main.js?v=20261018b" defer></script>
+<script src="assets/js/main.js?v=20261018c" defer></script>
 </body>
 </html>

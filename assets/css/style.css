@@ -36,7 +36,9 @@
   --radius-md: 14px;
   --wrap: 1180px;
   --ease: cubic-bezier(.22, .68, 0, 1);
-}
+
+  /* 星轨轨道已点亮比例（0~1），由 JS 在点亮时写入 .timeline 元素 */
+  --tl-p: 0;}
 
 html[data-theme="light"] {
   --navy-900: #f4f7ff;
@@ -1039,12 +1041,11 @@ html[data-theme="light"] .hero-card-body { background: linear-gradient(180deg, t
 .chip {
   padding: 5px 12px;
   border-radius: 999px;
-  font-size: .76rem;
+  font-size: .79rem;
   letter-spacing: .04em;
   color: var(--ice-200);
   border: 1px solid var(--glass-bd-strong);
-  background: rgba(120, 160, 255, .12);
-}
+  background: rgba(120, 160, 255, .12); line-height: 1.78;}
 /* 金色强调标签 */
 .chip.gold-chip {
   color: #1a1206;
@@ -1059,7 +1060,7 @@ html[data-theme="light"] .hero-card-body { background: linear-gradient(180deg, t
   color: var(--text);
   font-weight: 500;
 }
-.quote-note { margin: 0; font-size: .8rem; color: var(--text-dim); }
+.quote-note { margin: 0; font-size: .88rem; color: var(--text-dim); line-height: 1.78;}
 
 .scroll-hint {
   position: absolute;
@@ -1112,7 +1113,7 @@ html[data-theme="light"] .section::before {
 .section-head { max-width: 760px; margin-bottom: clamp(34px, 5vw, 60px); }
 .kicker {
   margin: 0 0 14px;
-  font-size: .76rem;
+  font-size: .8rem;
   letter-spacing: .3em;
   text-transform: uppercase;
   color: var(--ice-400);
@@ -1187,7 +1188,7 @@ html[data-theme="light"] .section::before {
   border: 1px solid var(--glass-bd);
   background: rgba(120, 160, 255, .06);
 }
-.info-item span { font-size: .72rem; letter-spacing: .16em; color: var(--text-dim); text-transform: uppercase; }
+.info-item span { font-size: .76rem; letter-spacing: .16em; color: var(--text-dim); text-transform: uppercase; }
 .info-item b { font-size: .96rem; font-weight: 600; }
 
 .trait-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; }
@@ -1203,7 +1204,7 @@ html[data-theme="light"] .section::before {
 }
 .hobby-title {
   margin: 0 0 18px;
-  font-size: .78rem;
+  font-size: .82rem;
   letter-spacing: .24em;
   text-transform: uppercase;
   color: var(--ice-400);
@@ -1244,7 +1245,7 @@ html[data-theme="light"] .section::before {
   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
 .hobby-card b { display: block; margin-bottom: 7px; font-size: .98rem; }
-.hobby-card p { margin: 0; font-size: .86rem; line-height: 1.7; color: var(--text-soft); }
+.hobby-card p { margin: 0; font-size: .95rem; line-height: 1.7; color: var(--text-soft); }
 
 /* 棋艺：主推爱好，用星光金强调，并铺一层淡棋盘格 */
 .hobby-card.is-star {
@@ -1359,13 +1360,13 @@ html[data-theme="light"] .section::before {
 
 .work-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .work-tag {
-  font-size: .72rem;
+  font-size: .75rem;
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--ice-300);
 }
 .work-status {
-  font-size: .72rem;
+  font-size: .75rem;
   padding: 4px 11px;
   border-radius: 999px;
   border: 1px solid var(--glass-bd);
@@ -1378,7 +1379,7 @@ html[data-theme="light"] .section::before {
   font-weight: 600;
 }
 .work-card h3 { margin: 0 0 12px; font-size: 1.22rem; letter-spacing: -.01em; }
-.work-card p { margin: 0 0 18px; font-size: .93rem; color: var(--text-soft); }
+.work-card p { margin: 0 0 18px; font-size: 1rem; color: var(--text-soft); line-height: 1.78;}
 .work-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1388,7 +1389,7 @@ html[data-theme="light"] .section::before {
   padding: 0;
 }
 .work-meta li {
-  font-size: .74rem;
+  font-size: .78rem;
   padding: 4px 10px;
   border-radius: 8px;
   color: var(--text-dim);
@@ -1449,13 +1450,13 @@ html[data-theme="light"] .section::before {
 .tl-time {
   display: inline-block;
   margin-bottom: 8px;
-  font-size: .72rem;
+  font-size: .76rem;
   letter-spacing: .18em;
   text-transform: uppercase;
   color: var(--ice-400);
 }
 .tl-card h3 { margin: 0 0 8px; font-size: 1.06rem; }
-.tl-card p { margin: 0; font-size: .92rem; color: var(--text-soft); }
+.tl-card p { margin: 0; font-size: 1rem; color: var(--text-soft); line-height: 1.78;}
 
 /* ------------------------------ 留言板 ------------------------------ */
 .guest-grid {
@@ -1467,7 +1468,7 @@ html[data-theme="light"] .section::before {
 .guest-form label {
   display: block;
   margin-bottom: 8px;
-  font-size: .8rem;
+  font-size: .84rem;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -1496,8 +1497,8 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
   box-shadow: 0 0 0 4px rgba(120, 170, 255, .16);
 }
 .form-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
-.counter { font-size: .8rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.form-tip { min-height: 1.4em; margin: 14px 0 0; font-size: .86rem; color: var(--ice-200); }
+.counter { font-size: .83rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.form-tip { min-height: 1.4em; margin: 14px 0 0; font-size: .9rem; color: var(--ice-200); line-height: 1.78;}
 .form-tip.is-error { color: #ffa8a8; }
 
 .guest-list-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
@@ -1505,7 +1506,7 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
   border: 0;
   background: none;
   padding: 4px;
-  font-size: .78rem;
+  font-size: .82rem;
   color: var(--text-dim);
   cursor: pointer;
   border-bottom: 1px dashed transparent;
@@ -1623,7 +1624,7 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
   bottom: 8px;
   padding: 5px 12px;
   border-radius: 999px;
-  font-size: .72rem;
+  font-size: .75rem;
   letter-spacing: .1em;
   color: #071127;
   background: linear-gradient(120deg, var(--ice-200), var(--gold));
@@ -1821,7 +1822,7 @@ html[data-theme="light"] .guest-form textarea { background: rgba(255, 255, 255, 
   max-width: 86%;
   padding: 9px 13px;
   border-radius: 14px;
-  font-size: .87rem;
+  font-size: .94rem;
   line-height: 1.62;
   word-break: break-word;
   animation: ai-pop .3s var(--ease);
@@ -1954,8 +1955,8 @@ html[data-theme="light"] .site-footer { background: rgba(255, 255, 255, .7); }
   flex-wrap: wrap;
 }
 .footer-logo { margin: 0 0 4px; font-weight: 600; letter-spacing: .06em; }
-.footer-note { margin: 0; font-size: .84rem; color: var(--text-dim); }
-.footer-meta { margin: 0; font-size: .78rem; color: var(--text-dim); text-align: right; }
+.footer-note { margin: 0; font-size: .88rem; color: var(--text-dim); line-height: 1.78;}
+.footer-meta { margin: 0; font-size: .82rem; color: var(--text-dim); text-align: right; }
 
 .to-top {
   position: fixed;
@@ -2586,3 +2587,378 @@ html.is-debug .build-stamp {
 }
 
 html.is-debug .build-tag { display: inline-block !important; }
+
+/* ==================================================================
+   星轨 · 可点亮的成长路径
+   评审建议（A3.2）：「缺少独到交互，可把星轨做成可点亮的成长路径」
+
+   交互：点击 / 键盘回车点亮一个节点 -> 节点中心亮起金光、卡片转金色描边、
+   左侧轨道线从顶部向下填充，顶部计数与提示同步变化，全亮时给出收尾文案。
+   状态存 localStorage，刷新保留。
+
+   性能：所有动画只用 transform（scaleY / scale）与 opacity，
+   不碰 width/height/box-shadow 的关键帧插值 —— 这是之前排查过的闪烁根因。
+   ================================================================== */
+
+/* ---- 顶部进度指示 ---- */
+.tl-meter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 16px;
+  margin: 0 0 26px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-bd);
+  background: var(--glass-bg);
+}
+
+.tl-meter-num {
+  margin: 0;
+  font-size: .86rem;
+  letter-spacing: .1em;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-meter-num b {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 0;
+  margin-right: 2px;
+}
+
+.tl-meter-hint {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 12em;
+  font-size: .8rem;
+  color: var(--text-dim);
+}
+
+.tl-meter-reset {
+  margin-left: auto;
+  font-size: .76rem;
+  opacity: .75;
+  transition: opacity .25s;
+}
+
+.tl-meter-reset:hover { opacity: 1; }
+
+/* ---- 轨道金色填充：用 scaleY，origin 在顶部 ---- */
+.timeline::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 2px;
+  height: calc(100% - 16px);
+  border-radius: 2px;
+  background: linear-gradient(180deg,
+    rgba(242, 215, 155, .95) 0%,
+    rgba(242, 215, 155, .75) 60%,
+    rgba(255, 232, 168, .35) 100%);
+  transform: scaleY(var(--tl-p, 0));
+  transform-origin: top center;
+  transition: transform .55s cubic-bezier(.2, .8, .3, 1);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ---- 节点可交互 ---- */
+.tl-item {
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition: transform .3s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tl-item:hover { transform: translateX(3px); }
+.tl-item:focus { outline: none; }
+
+.tl-item:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 4px;
+}
+
+/* ---- 点亮状态：光点 ---- */
+/* 用伪元素做金色内芯，scale 从 0 到 1 —— 纯合成，无重绘 */
+.tl-item .tl-dot::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, .98) 0%,
+    rgba(255, 236, 180, .95) 45%,
+    rgba(242, 215, 155, .6) 100%);
+  transform: scale(0);
+  opacity: 0;
+  transition: transform .35s cubic-bezier(.2, .9, .3, 1.2), opacity .3s;
+  will-change: transform, opacity;
+}
+
+.tl-item.is-lit .tl-dot {
+  border-color: var(--gold);
+}
+
+.tl-item.is-lit .tl-dot::after {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* 光点外扩的柔光：同样用 transform 做，不逐帧改阴影 */
+.tl-item .tl-dot::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 215, 155, .55) 0%, rgba(242, 215, 155, 0) 70%);
+  transform: scale(.4);
+  opacity: 0;
+  transition: transform .5s cubic-bezier(.2, .8, .3, 1), opacity .4s;
+  will-change: transform, opacity;
+}
+
+.tl-item.is-lit .tl-dot::before {
+  transform: scale(1.6);
+  opacity: 1;
+}
+
+/* ---- 点亮状态：卡片 ---- */
+.tl-item.is-lit .tl-card {
+  border-color: rgba(242, 215, 155, .42);
+  background: linear-gradient(140deg,
+    rgba(242, 215, 155, .1) 0%,
+    rgba(22, 33, 70, .92) 55%,
+    rgba(12, 19, 44, .92) 100%);
+}
+
+.tl-item.is-lit .tl-time {
+  color: var(--gold);
+}
+
+.tl-item.is-lit .tl-card h3 {
+  color: #fff8e6;
+}
+
+/* ---- 节点序号（点亮后出现的高光边）---- */
+.tl-item .tl-card {
+  position: relative;
+}
+
+.tl-item .tl-card::after {
+  content: "✦ 已点亮";
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  font-size: .68rem;
+  letter-spacing: .12em;
+  color: var(--gold);
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity .35s, transform .35s;
+  pointer-events: none;
+}
+
+.tl-item.is-lit .tl-card::after {
+  opacity: .9;
+  transform: translateX(0);
+}
+
+/* ---- 全亮时的收尾态 ---- */
+.timeline.is-complete .tl-dot {
+  border-color: rgba(242, 215, 155, .9);
+}
+
+.tl-meter.is-complete .tl-meter-num b {
+  color: #ffe9b8;
+}
+
+.tl-meter.is-complete .tl-meter-hint {
+  color: var(--gold);
+}
+
+/* ---- 小屏适配 ---- */
+@media (max-width: 560px) {
+  .tl-meter { padding: 13px 15px; gap: 4px 12px; }
+  .tl-meter-num b { font-size: 1.25rem; }
+  .tl-meter-reset { margin-left: 0; }
+  .tl-item .tl-card::after { display: none; }   /* 窄屏隐藏角标，避免挤压标题 */
+}
+
+/* ---- 减少动效 ---- */
+@media (prefers-reduced-motion: reduce) {
+  .timeline::after,
+  .tl-item,
+  .tl-item .tl-dot::after,
+  .tl-item .tl-dot::before,
+  .tl-item .tl-card::after {
+    transition: none !important;
+  }
+  .tl-item:hover { transform: none; }
+}
+
+/* ==================================================================
+   状态细节 · 交互反馈的统一语言
+   评审 A4.2 指出反馈偏"常规"，这里补一套与星庭主题一致的状态语言：
+   金色作为"已被选中/正在操作"的统一信号。
+
+   性能约束：所有过渡只涉及 transform 与 opacity，
+   不对 box-shadow / width 做关键帧插值（那是之前排查过的闪烁根因）。
+   ================================================================== */
+
+/* ---- ① 导航：金色下划线滑入 ---- */
+.nav-link {
+  position: relative;
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 5px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg,
+    rgba(242, 215, 155, 0) 0%,
+    rgba(242, 215, 155, .95) 50%,
+    rgba(242, 215, 155, 0) 100%);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform .34s cubic-bezier(.2, .8, .3, 1);
+  pointer-events: none;
+}
+
+.nav-link:hover::after { transform: scaleX(.55); }
+.nav-link.is-active::after { transform: scaleX(1); }
+.nav-link.is-active { color: var(--gold); }
+
+/* ---- ② 作品卡：左侧金色竖线展开 ---- */
+.work-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12%;
+  bottom: 12%;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg,
+    rgba(242, 215, 155, 0) 0%,
+    rgba(242, 215, 155, .95) 50%,
+    rgba(242, 215, 155, 0) 100%);
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform .42s cubic-bezier(.2, .8, .3, 1);
+  pointer-events: none;
+}
+
+.work-card:hover::before,
+.work-card:focus-within::before {
+  transform: scaleY(1);
+}
+
+.work-card:hover h3,
+.work-card:focus-within h3 {
+  color: #fff8e6;
+}
+
+/* 作品链接的箭头在 hover 时右移（gap 已有过渡，这里加强箭头本身） */
+.work-link svg {
+  transition: transform .3s var(--ease);
+}
+
+.work-link:hover svg {
+  transform: translate(2px, -2px);
+}
+
+.work-link.is-primary:hover svg {
+  transform: translateX(3px);
+}
+
+/* ---- ③ 兴趣卡：顶部金线展开 ---- */
+.hobby-card {
+  position: relative;
+}
+
+.hobby-card::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 0;
+  height: 1.5px;
+  background: linear-gradient(90deg,
+    rgba(242, 215, 155, 0) 0%,
+    rgba(242, 215, 155, .9) 50%,
+    rgba(242, 215, 155, 0) 100%);
+  transform: scaleX(0);
+  transition: transform .44s cubic-bezier(.2, .8, .3, 1);
+  pointer-events: none;
+}
+
+.hobby-card:hover::before { transform: scaleX(1); }
+
+/* ---- ④ 统一金色焦点环 ---- */
+/* 原来所有元素用冰蓝色 outline，与站点的金色主强调不统一。
+   键盘用户看到的焦点环现在与"选中/点亮"是同一套语言。 */
+:focus-visible {
+  outline: 2px solid rgba(242, 215, 155, .85);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* 深色背景上再加一层柔和外扩，保证在任意底色上都看得清 */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.tl-item:focus-visible {
+  outline: 2px solid rgba(242, 215, 155, .9);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(242, 215, 155, .14);
+}
+
+/* ---- ⑤ 按下反馈：轻微内收 ---- */
+.btn-primary:active,
+.btn-enter:active,
+button:active:not(:disabled) {
+  transform: scale(.975);
+}
+
+/* 链接类按钮按下时下移 1px，模拟"按进去" */
+.text-btn:active,
+.work-link:active {
+  transform: translateY(1px);
+}
+
+/* ---- ⑥ 可点击卡片：清楚表明它可点 ---- */
+.hobby-card,
+.work-card,
+.guest-list li {
+  cursor: default;
+}
+
+.work-card a,
+.hobby-card a {
+  cursor: pointer;
+}
+
+/* ---- ⑦ 减少动效：去掉所有过渡 ---- */
+@media (prefers-reduced-motion: reduce) {
+  .nav-link::after,
+  .work-card::before,
+  .hobby-card::before,
+  .work-link svg {
+    transition: none !important;
+  }
+  .nav-link:hover::after,
+  .nav-link.is-active::after,
+  .work-card:hover::before,
+  .work-card:focus-within::before,
+  .hobby-card:hover::before {
+    transform: none;
+  }
+}

@@ -1266,10 +1266,26 @@
     return once();
   }
 
+  /* AbortSignal.timeout 是 Chrome 103+ 才有的 API。
+     在不支持的浏览器上，它会在构造 fetch 参数时就抛 TypeError ——
+     那不是 Promise 拒绝，外层 .catch() 抓不到，会直接冒到控制台。
+     这里先探测能力，不支持就返回 undefined（不带超时信号，功能不受影响）。 */
+  var _canTimeout = (function () {
+    try {
+      return typeof AbortSignal !== 'undefined' &&
+        typeof AbortSignal.timeout === 'function';
+    } catch (e) { return false; }
+  })();
+
+  function safeTimeout(ms) {
+    if (!_canTimeout) return undefined;
+    try { return AbortSignal.timeout(ms); } catch (e) { return undefined; }
+  }
+
   // 读：GET 一个纯文本 JSON 数组；失败时抛错，由上层兜底
   function gbFetch() {
     return gbRequest(GB.readBase + encodeURIComponent(GB.key) + '?t=' + Date.now(), {
-      signal: AbortSignal.timeout(15000)
+      signal: safeTimeout(15000)
     }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
@@ -1301,7 +1317,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
         body: body.toString(),
-        signal: AbortSignal.timeout(20000)
+        signal: safeTimeout(20000)
       });
     }).then(function (r) {
       if (!r.ok) {
@@ -2118,6 +2134,112 @@
   }
 
   /* --------------------------------------------------- 首屏「进入星庭」按钮 */
+  /* ------------------------------------------------------------------ 星轨
+     把「星轨」做成可点亮的成长路径（评审建议 A3.2）。
+
+     交互：点击节点或按回车/空格点亮，再点一次熄灭。
+     点亮后节点中心亮起金光、卡片转金色描边、左侧轨道从顶部向下填充。
+     状态存 localStorage，刷新后保留；可一键全部熄灭。
+
+     无障碍：节点是 role="button" + aria-pressed，键盘可达，有 focus 样式。
+     性能：轨道填充用 transform: scaleY()，光点用 transform: scale()，
+     不碰 width/height/box-shadow 的关键帧插值。 */
+  function initJourney() {
+    var list = $('#timeline');
+    if (!list) return;
+
+    var items = $$('.tl-item', list);
+    if (!items.length) return;
+
+    var countEl = $('#tlCount');
+    var totalEl = $('#tlTotal');
+    var hintEl = $('#tlHint');
+    var resetBtn = $('#tlReset');
+    var meter = document.querySelector('.tl-meter');
+    var KEY = 'tianyi-journey-lit';
+
+    if (totalEl) totalEl.textContent = String(items.length);
+
+    /* ---------- 读取已保存的进度 ---------- */
+    var lit = {};
+    try {
+      var raw = localStorage.getItem(KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(arr)) {
+        arr.forEach(function (i) {
+          if (typeof i === 'number' && i >= 0 && i < items.length) lit[i] = true;
+        });
+      }
+    } catch (e) {}
+
+    function save() {
+      try {
+        var arr = [];
+        for (var k in lit) { if (lit[k]) arr.push(Number(k)); }
+        arr.sort(function (a, b) { return a - b; });
+        localStorage.setItem(KEY, JSON.stringify(arr));
+      } catch (e) {}
+    }
+
+    /* ---------- 同步界面 ---------- */
+    function render() {
+      var count = 0;
+      for (var i = 0; i < items.length; i++) {
+        var on = !!lit[i];
+        if (on) count++;
+        items[i].classList.toggle('is-lit', on);
+        items[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+
+      if (countEl) countEl.textContent = String(count);
+
+      // 轨道填充比例交给 CSS 变量，动画在 CSS 里用 transform 完成
+      var ratio = items.length ? count / items.length : 0;
+      list.style.setProperty('--tl-p', String(ratio));
+
+      var done = count === items.length;
+      list.classList.toggle('is-complete', done);
+      if (meter) meter.classList.toggle('is-complete', done);
+
+      if (hintEl) {
+        if (done) hintEl.textContent = '星轨全亮 ✦ 这就是我走到今天的样子';
+        else if (count === 0) hintEl.textContent = '点一下节点，把走过的路点亮';
+        else hintEl.textContent = '还差 ' + (items.length - count) + ' 个节点，继续点亮 ✦';
+      }
+
+      if (resetBtn) resetBtn.style.display = count ? '' : 'none';
+    }
+
+    /* ---------- 切换单个节点 ---------- */
+    function toggle(i) {
+      lit[i] = !lit[i];
+      if (!lit[i]) delete lit[i];
+      save();
+      render();
+    }
+
+    items.forEach(function (el, i) {
+      el.addEventListener('click', function () { toggle(i); });
+
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          toggle(i);
+        }
+      });
+    });
+
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function () {
+        lit = {};
+        save();
+        render();
+      });
+    }
+
+    render();
+  }
+
   /* ------------------------------------------------------------------ 内联试玩
      作品卡里的「直接在这里玩」面板。
      实现要点：
@@ -2648,6 +2770,7 @@
       ['AI 形象互动', initAI],
       ['开场页', initEntry],
       ['进入按钮', initEnterButton],
+      ['星轨点亮', initJourney],
       ['内联试玩', initInlinePlay]
     ];
 
