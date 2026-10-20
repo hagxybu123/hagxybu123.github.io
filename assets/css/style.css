@@ -490,10 +490,11 @@ code {
 ::selection { background: rgba(120, 170, 255, .35); color: #fff; }
 
 :focus-visible {
-  outline: 2px solid var(--ice-300);
-  outline-offset: 3px;
-  border-radius: 6px;
-}
+    /* 金色焦点环：与"已点亮 / 已选中"是同一套状态语言 */
+    outline: 2px solid rgba(242, 215, 155, .85);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
 
 .wrap {
   width: 100%;
@@ -2904,12 +2905,6 @@ html.is-debug .build-tag { display: inline-block !important; }
 /* ---- ④ 统一金色焦点环 ---- */
 /* 原来所有元素用冰蓝色 outline，与站点的金色主强调不统一。
    键盘用户看到的焦点环现在与"选中/点亮"是同一套语言。 */
-:focus-visible {
-  outline: 2px solid rgba(242, 215, 155, .85);
-  outline-offset: 3px;
-  border-radius: 6px;
-}
-
 /* 深色背景上再加一层柔和外扩，保证在任意底色上都看得清 */
 a:focus-visible,
 button:focus-visible,
