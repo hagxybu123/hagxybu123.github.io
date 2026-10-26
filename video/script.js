@@ -151,10 +151,10 @@
   var pausedAt = 0;
   var wasRunning = false;
 
-  // 支持 ?auto=1 直接自动播放（用于嵌入或测试）
-  if (location.search.indexOf("auto=1") !== -1) {
-    window.addEventListener("load", function () {
-      setTimeout(play, 250);
-    });
-  }
+  // 打开即自动播放。页面没有音频轨道，浏览器的自动播放限制不适用，
+  // 因此不需要用户点击。起始按钮仅在自动播放被环境阻断时作为兜底。
+  window.addEventListener("load", function () {
+    startBtn.classList.add("hide");
+    setTimeout(play, 350);
+  });
 })();
